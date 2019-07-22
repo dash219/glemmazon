@@ -1,7 +1,8 @@
 # Models
 ## en
 - Latest release: 2019-07-21
-- Training data: [en_ewt-ud-train.conllu](http://github.com/UniversalDependencies/UD_English-EWT)
+- Training data: [en_ewt-ud-train.conllu](
+  http://github.com/UniversalDependencies/UD_English-EWT)
 - Exceptions dict: [en_exceptions.csv](../data/en_exceptions.csv)
 
 ```
@@ -57,4 +58,68 @@ Suffix identification stats (val: 0.2)
     accuracy                           0.97      4185
    macro avg       0.38      0.41      0.36      4185
 weighted avg       0.97      0.97      0.97      4185
+```
+
+## pt
+- Latest release: 2019-07-22
+- Training data: [pt_gsd-ud-train.conllu](
+  http://github.com/UniversalDependencies/UD_Portuguese-GSD)
+- Exceptions dict: None
+
+```
+Index identification stats (val: 0.2)
+-----------------------------------------------------
+              precision    recall  f1-score   support
+
+           0       0.97      0.97      0.97      4286
+           1       0.87      0.87      0.87       852
+           2       0.87      0.89      0.88       627
+           3       0.82      0.91      0.86       341
+           4       0.33      0.12      0.18        40
+           5       0.67      0.17      0.27        12
+           6       0.50      0.09      0.15        11
+           7       0.00      0.00      0.00         3
+
+    accuracy                           0.94      6172
+   macro avg       0.63      0.50      0.52      6172
+weighted avg       0.93      0.94      0.93      6172
+
+
+Suffix identification stats (val: 0.2)
+-----------------------------------------------------
+              precision    recall  f1-score   support
+
+                   0.97      0.98      0.98      4870
+           a       0.00      0.00      0.00         5
+        aber       0.00      0.00      0.00         1
+          ar       0.89      0.80      0.84       165
+        aver       0.00      0.00      0.00         2
+        azer       0.00      0.00      0.00         3
+         car       0.00      0.00      0.00         1
+         cer       0.00      0.00      0.00         0
+         der       0.00      0.00      0.00         1
+           e       0.00      0.00      0.00         3
+       eguir       0.00      0.00      0.00         0
+          el       0.00      0.00      0.00         1
+          er       0.51      0.45      0.48        71
+        erer       0.00      0.00      0.00         1
+        erir       1.00      1.00      1.00         1
+        ever       0.00      0.00      0.00         2
+         ger       0.00      0.00      0.00         0
+          ir       0.54      0.42      0.48        45
+           l       0.85      0.95      0.90        42
+           m       0.89      0.80      0.84        10
+           o       0.89      0.84      0.86       266
+          ol       0.00      0.00      0.00         2
+          or       1.00      0.50      0.67         2
+           r       0.87      0.87      0.87       588
+         rir       0.00      0.00      0.00         2
+         zer       0.00      0.00      0.00         4
+          ão       0.95      1.00      0.97        74
+         çar       0.00      0.00      0.00         1
+          ês       0.83      0.56      0.67         9
+
+    accuracy                           0.95      6172
+   macro avg       0.35      0.32      0.33      6172
+weighted avg       0.94      0.95      0.94      6172
 ```
