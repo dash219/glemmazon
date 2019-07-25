@@ -5,7 +5,6 @@ __all__ = ['Lemmatizer']
 from typing import Dict, Iterator, List, Tuple
 
 import numpy as np
-import pandas as pd
 import pickle
 
 from keras.preprocessing.sequence import pad_sequences
@@ -13,8 +12,8 @@ from keras.preprocessing.text import Tokenizer
 from keras.models import Sequential
 from keras.utils import to_categorical
 
+from glemmazon import preprocess
 from glemmazon import string_ops
-from glemmazon import constants as k
 
 
 def _build_index_dict(iterable):
@@ -144,14 +143,8 @@ class Lemmatizer(object):
                 'Model attribute "%s" does not have type "%s".' % (
                     attr, attr_type.__name__))
 
-    def load_exceptions(self, path: str,
-                        word_col: str = k.WORD_COL,
-                        pos_col: str = k.POS_COL,
-                        lemma_col: str = k.LEMMA_COL):
-        df = pd.read_csv(path)
-        df = df[[word_col, pos_col, lemma_col]].set_index([
-            word_col, pos_col])
-        self.set_exceptions(df[lemma_col].to_dict())
+    def load_exceptions(self, path: str):
+        self.set_exceptions(preprocess.exceptions_to_dict(path))
 
     def set_exceptions(self, exceptions: Dict[Tuple[str, str], str]):
         self.exceptions = exceptions

@@ -1,8 +1,8 @@
 """Functions for preprocessing data."""
 
-__all__ = ['conllu_to_df', 'unimorph_to_df']
+__all__ = ['conllu_to_df', 'exceptions_to_dict', 'unimorph_to_df']
 
-from typing import Callable, Dict, Set
+from typing import Callable, Dict, Tuple, Set
 
 import tqdm
 import pandas as pd
@@ -53,6 +53,13 @@ def conllu_to_df(path: str,
     return df
 
 
+def exceptions_to_dict(path: str) -> Dict[Tuple[str,str], str]:
+    df = pd.read_csv(path)
+    df = df[[k.WORD_COL, k.POS_COL, k.LEMMA_COL]].set_index([k.WORD_COL,
+                                                             k.POS_COL])
+    return df[k.LEMMA_COL].to_dict()
+
+
 def unimorph_to_df(path: str,
                    clean_up: Callable = cleanup.dummy,
                    lemma_suffix_col: str = k.SUFFIX_COL,
@@ -67,7 +74,6 @@ def unimorph_to_df(path: str,
     df = df.drop(k.MORPH_FEATURES_COL, axis=1)
 
     df = clean_up(df)
-    print(df.head())
     df = _add_lemma_info(df)
 
     # Exclude inflection patterns that occur only once.
@@ -111,6 +117,7 @@ def _conllu_to_tokens(path: str) -> Set[Dict[str, str]]:
     return tokens
 
 
+# noinspection PyProtectedMember
 def _flatten_token(token: Token) -> Dict[str, str]:
     """Flatten a CoNLL-U token annotation: {a: {b}} -> {a: b}."""
     flattened = {}

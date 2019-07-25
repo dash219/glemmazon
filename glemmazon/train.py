@@ -12,13 +12,12 @@ python glemmazon/train.py \
   --exceptions data/en_exceptions.csv
 """
 
-__all__ = ['Lemmatizer']
-
 import sys
 
 import numpy as np
 import pandas as pd
 import pickle
+import tqdm
 
 from absl import app
 from absl import flags
@@ -39,7 +38,6 @@ flags.DEFINE_string("conllu", None, "Path to a CoNLL-U file.")
 flags.DEFINE_string("unimorph", None, "Path to a UniMorph file.")
 flags.DEFINE_string("model", None,
                     "Path to store the Pickle file with the model.")
-
 flags.DEFINE_string("exceptions", None,
                     "Path to a CSV with lemma exceptions [columns: "
                     "'word', 'pos', 'lemma'].")
@@ -52,10 +50,13 @@ flags.DEFINE_string("cleanup_unimorph", "dummy",
 flags.DEFINE_integer("min_count", 3,
                      "The minimum number of counts a lemma suffix need "
                      "to have for it to be included for training.")
-
 flags.DEFINE_integer("max_features", 256,
                      "The maximum number of characters to be "
                      "considered in the vocabulary.")
+flags.DEFINE_boolean("no_losses", True,
+                     "If True, losses from training data will be added "
+                     "to the model's exception dictionary (not to the "
+                     ".csv file though).")
 flags.DEFINE_integer("embedding_size", 16, "Embedding size.")
 flags.DEFINE_integer("batch_size", 16, "Mini-batch size.")
 flags.DEFINE_integer("maxlen", 10,
@@ -94,6 +95,13 @@ def _extract_features(words, pos_list, pos_to_ix, tokenizer,
         tokenizer.texts_to_sequences(words), maxlen)
     pos_feats = _encode_labels(pos_list, pos_to_ix)
     return np.concatenate([words_feats, pos_feats], axis=1)
+
+
+def _add_losses_as_exceptions(l, df):
+    for entry in tqdm.tqdm(df.itertuples()):
+        lemma_pred = l([entry.word], [entry.pos])[0]
+        if lemma_pred != entry.lemma:
+            l.exceptions[(entry.word, entry.pos)] = entry.lemma
 
 
 # noinspection PyPep8Naming
@@ -174,8 +182,13 @@ def main(_):
                     epochs=FLAGS.epochs,
                     validation_data=[x_test, yi_test])
 
+    exceptions = {}
+    if FLAGS.exceptions:
+        print('Loading exceptions...')
+        exceptions = preprocess.exceptions_to_dict(FLAGS.exceptions)
+
     print('Persisting the model...')
-    pickle.dump({
+    model = {
         'index_model': index_model,
         'suffix_model': suffix_model,
         'suffix_to_ix': suffix_to_ix,
@@ -183,7 +196,21 @@ def main(_):
         'pos_to_ix': pos_to_ix,
         'tokenizer': tokenizer,
         'maxlen': FLAGS.maxlen,
-    }, open(FLAGS.model, 'wb'))
+        'exceptions': exceptions,
+    }
+
+    # Add losses to the exception dictionary, so that they can be
+    # labeled correctly, if specified by the caller.
+    if FLAGS.no_losses:
+        print('Adding losses to the dictionary with exceptions...')
+        l = Lemmatizer()
+        l.set_model(**model)
+        n_start = len(l.exceptions)
+        _add_losses_as_exceptions(l, df)
+        print('# Exceptions added: %d' % (len(l.exceptions) - n_start))
+        model['exceptions'] = l.exceptions
+
+    pickle.dump(model, open(FLAGS.model, 'wb'))
     print('Model successfully saved in: %s.' % FLAGS.model)
 
 
