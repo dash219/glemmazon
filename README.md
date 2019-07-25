@@ -15,8 +15,9 @@ provides a single interface for getting the lemmas, under `__call__`:
 from glemmazon import Lemmatizer
 l = Lemmatizer()
 l.load('models/en.pkl')
-l('loves', 'VERB')
-'love'
+l(['loved', 'works', 'cars', 'was'], ['VERB', 'VERB', 'NOUN', 'VERB'])
+['love', 'work', 'car', 'be']
+
 ```
 
 ## Training a new model

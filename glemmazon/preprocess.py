@@ -1,36 +1,45 @@
 """Functions for preprocessing data."""
 
-__all__ = ['conllu_to_df', 'extract_features', 'prepare_data']
+__all__ = ['conllu_to_df', 'unimorph_to_df']
 
-from typing import Callable, Dict, List, Set
+from typing import Callable, Dict, Set
 
 import tqdm
-import numpy as np
+import pandas as pd
 import pyconll
 
 from pandas import DataFrame
 from pyconll.unit import Token
-from sklearn.feature_extraction import DictVectorizer
-from sklearn.model_selection import train_test_split
 
 from glemmazon import cleanup
 from glemmazon import string_ops
+from glemmazon import constants as k
 
-# Columns from UniversalDependencies.
-_WORD_COL = 'word'
-_POS_COL = 'pos'
-_LEMMA_COL = 'lemma'
-
-# Columns added for the Lemmatizer.
-_SUFFIX_COL = '_lemma_suffix'
-_INDEX_COL = '_lemma_index'
-
-_UNKNOWN_POS = '_UNKNOWN_POS'
+# Note: the reason for having a hard-coded dictionary here, instead of
+# reusing the available mapping from UniMorph, is because there are
+# ambiguous cases, e.g. 'V' (unimorph) -> 'AUX,VERB' (UD); and we need
+# to set explicit preferences.
+_POS_UNIMORPH2UD = {
+    'ADV': 'ADV',
+    'PRO': 'PRON',
+    'V': 'VERB',
+    'ADP': 'ADP',
+    'DET': 'DET',
+    'N': 'NOUN',
+    'ADJ': 'ADJ',
+    'CONJ': 'CCONJ',
+    'PUNCT': 'X',
+    'NUM': 'NUM',
+    'PROPN': 'PROPN',
+    'PART': 'PART',
+    'INTJ': 'INTJ',
+    'V.PTCP': 'VERB',
+}
 
 
 def conllu_to_df(path: str,
                  clean_up: Callable = cleanup.dummy,
-                 lemma_suffix_col: str = _SUFFIX_COL,
+                 lemma_suffix_col: str = k.SUFFIX_COL,
                  min_count: int = 3) -> DataFrame:
     entries = _conllu_to_tokens(path)
     df = DataFrame(entries)
@@ -44,55 +53,28 @@ def conllu_to_df(path: str,
     return df
 
 
-def extract_features(word: str, pos: str) -> dict:
-    return {
-        '_suffix_1': word[-1:],
-        '_suffix_2': word[-2:],
-        '_suffix_3': word[-3:],
-        '_len_word': len(word),
-        '_pos': pos,
-    }
+def unimorph_to_df(path: str,
+                   clean_up: Callable = cleanup.dummy,
+                   lemma_suffix_col: str = k.SUFFIX_COL,
+                   min_count: int = 3) -> DataFrame:
+    df = pd.read_csv(path, delimiter='\t', names=[
+        k.LEMMA_COL, k.WORD_COL, k.MORPH_FEATURES_COL],
+                     keep_default_na=False)
 
+    df[k.POS_COL] = df[k.MORPH_FEATURES_COL].apply(
+        lambda x: _POS_UNIMORPH2UD[x.split(';')[0]])
 
-# noinspection PyPep8Naming
-def prepare_data(df: DataFrame,
-                 feature_cols: List[str],
-                 lemma_index_col: str = _INDEX_COL,
-                 lemma_suffix_col: str = _SUFFIX_COL,
-                 test_size: float = 0.2):
-    train, test = train_test_split(df, test_size=test_size)
+    df = df.drop(k.MORPH_FEATURES_COL, axis=1)
 
-    # Use DataFrame() around "train" and "test" here, otherwise
-    # extracting features from them later too slow.
-    #
-    # TODO(gustavoauma): Find out why iterating over slices is slow.
-    X_train = DataFrame(train[feature_cols])
-    X_val = DataFrame(test[feature_cols])
+    df = clean_up(df)
+    print(df.head())
+    df = _add_lemma_info(df)
 
-    y1_train = train[[lemma_index_col]]
-    y1_val = test[[lemma_index_col]]
+    # Exclude inflection patterns that occur only once.
+    df = df.groupby(lemma_suffix_col).filter(
+        lambda r: r[lemma_suffix_col].count() > min_count)
 
-    y2_train = train[[lemma_suffix_col]]
-    y2_val = test[[lemma_suffix_col]]
-
-    # Change the shape of the array: (N, 1) -> (N,).
-    y1_train = np.array(y1_train).reshape(-1)
-    y1_val = np.array(y1_val).reshape(-1)
-
-    y2_train = np.array(y2_train).reshape(-1)
-    y2_val = np.array(y2_val).reshape(-1)
-
-    # Iterate over the rows and extract the features for both training
-    # and eval (this might be very slow).
-    X_train = _extract_features_df(X_train)
-    X_val = _extract_features_df(X_val)
-
-    # Vectorize the features
-    vec = DictVectorizer()
-    X_train = vec.fit_transform(X_train.T.to_dict().values()).toarray()
-    X_val = vec.transform(X_val.T.to_dict().values()).toarray()
-
-    return vec, X_train, y1_train, y2_train, X_val, y1_val, y2_val
+    return df
 
 
 class _HashableDict(dict):
@@ -101,10 +83,10 @@ class _HashableDict(dict):
 
 
 def _add_lemma_info(df: DataFrame,
-                    word_col: str = _WORD_COL,
-                    lemma_col: str = _LEMMA_COL,
-                    lemma_suffix_col: str = _SUFFIX_COL,
-                    lemma_index_col: str = _INDEX_COL) -> DataFrame:
+                    word_col: str = k.WORD_COL,
+                    lemma_col: str = k.LEMMA_COL,
+                    lemma_suffix_col: str = k.SUFFIX_COL,
+                    lemma_index_col: str = k.INDEX_COL) -> DataFrame:
     # Extract lemma suffix and r_index
     idxs = []
     lemmas = []
@@ -137,32 +119,10 @@ def _flatten_token(token: Token) -> Dict[str, str]:
 
     # Some lemmas are missing from the UD corpora. If that is the case,
     # assume that it coincides with the word form.
-    flattened[_LEMMA_COL] = (token.lemma.lower() if token.lemma
-                             else token._form.lower())
-    flattened[_POS_COL] = token.upos or _UNKNOWN_POS
+    flattened[k.LEMMA_COL] = (token.lemma.lower() if token.lemma
+                              else token._form.lower())
+    flattened[k.POS_COL] = token.upos or k.UNKNOWN_POS
 
     # TODO(gustavoauma): Check whether there is a public attribute.
-    flattened[_WORD_COL] = token._form.lower()
+    flattened[k.WORD_COL] = token._form.lower()
     return flattened
-
-
-def _extract_features_df(df: DataFrame,
-                         word_col: str = _WORD_COL,
-                         pos_col: str = _POS_COL) -> DataFrame:
-    # Add the feature columns to the DataFrame.
-    #
-    # This is hacky step, but necessary. The feature list is only
-    # maintained extract_features, to avoid redundancy. So we cannot
-    # really extract this information from anywhere else.
-    for k in extract_features('', '').keys():
-        df[k] = np.nan
-
-    for i in tqdm.tqdm(df.index):
-        word, pos = df.loc[i, [word_col, pos_col]]
-        features = extract_features(word, pos)
-
-        # Iterate over each feature from the dict and add its value to
-        # the DataFrame cell.
-        df.loc[i, features.keys()] = features.values()
-    df = df.drop([word_col], axis=1)
-    return df

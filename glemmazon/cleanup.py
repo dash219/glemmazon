@@ -1,6 +1,14 @@
-"""Language-specific functions for cleaning up UD data."""
+"""Dataset-specific functions for cleaning up data."""
+
+__all__ = ['dummy', 'en_ewt']
 
 from pandas import DataFrame
+
+from glemmazon import constants as k
+
+
+def _filter(df):
+    return df.filter([k.WORD_COL, k.POS_COL, k.LEMMA_COL])
 
 
 def en_ewt(df: DataFrame) -> DataFrame:
@@ -14,4 +22,4 @@ def en_ewt(df: DataFrame) -> DataFrame:
 
 
 def dummy(df: DataFrame) -> DataFrame:
-    return df
+    return _filter(df)
