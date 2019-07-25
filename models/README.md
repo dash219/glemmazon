@@ -1,125 +1,87 @@
 # Models
 ## en
-- Latest release: 2019-07-21
-- Training data: [en_ewt-ud-train.conllu](
-  http://github.com/UniversalDependencies/UD_English-EWT)
+- Latest release: 2019-07-25
+- Training data: 
+  - CoNLL-U: [en_ewt-ud-train.conllu](
+    http://github.com/UniversalDependencies/UD_English-EWT)
+  - UniMorph: [eng](https://github.com/unimorph/eng)
 - Exceptions dict: [en_exceptions.csv](../data/en_exceptions.csv)
 
 ```
-Index identification stats (val: 0.2)
------------------------------------------------------
-              precision    recall  f1-score   support
+MODELS CONFIG
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+embedding_1 (Embedding)      (None, 27, 16)            4096      
+_________________________________________________________________
+bidirectional_1 (Bidirection (None, 32)                4224      
+_________________________________________________________________
+dropout_1 (Dropout)          (None, 32)                0         
+_________________________________________________________________
+dense_1 (Dense)              (None, 89)                2937      
+=================================================================
+Total params: 11,257
+Trainable params: 11,257
+Non-trainable params: 0
 
-           0       0.99      0.99      0.99      3127
-           1       0.90      0.90      0.90       586
-           2       0.77      0.81      0.79       202
-           3       0.89      0.94      0.91       250
-           4       0.50      0.06      0.11        17
-           5       0.75      1.00      0.86         3
 
-    accuracy                           0.96      4185
-   macro avg       0.80      0.78      0.76      4185
-weighted avg       0.96      0.96      0.96      4185
+SUFFIX IDENTIFICATION
+---------------------
+Train on 89661 samples, validate on 22416 samples
+[...]
+Epoch 10/10
+89661/89661 [==============================] - 142s 2ms/step - 
+loss: 0.1739 - acc: 0.9522 - val_loss: 0.1549 - val_acc: 0.9545
 
-Suffix identification stats (val: 0.2)
------------------------------------------------------
-                   0.98      0.99      0.99      4020
-          's       1.00      0.50      0.67         2
-         ake       0.00      0.00      0.00         2
-          an       0.67      0.67      0.67         3
-        ause       0.50      0.50      0.50         2
-         ave       1.00      1.00      1.00         1
-          be       0.83      0.62      0.71         8
-           d       0.20      0.50      0.29         2
-           e       0.59      0.36      0.45        72
-         eak       0.50      0.50      0.50         2
-         ear       1.00      0.50      0.67         2
-          ed       0.00      0.00      0.00         1
-         ell       0.00      0.00      0.00         0
-          et       0.50      1.00      0.67         1
-           f       0.00      0.00      0.00         0
-        have       1.00      0.50      0.67         2
-         ing       0.00      0.00      0.00         3
-         ink       0.33      1.00      0.50         1
-         ive       0.00      0.00      0.00         2
-          ke       1.00      1.00      1.00         1
-          ly       0.00      0.00      0.00         1
-           o       0.00      0.00      0.00         1
-          of       0.00      0.00      0.00         0
-         ome       0.00      0.00      0.00         0
-          ot       0.25      1.00      0.40         1
-          ow       0.50      1.00      0.67         1
-           r       0.00      0.00      0.00         2
-           t       0.00      0.00      0.00         1
-          to       0.00      0.00      0.00         1
-          ve       0.00      0.00      0.00         1
-           y       0.89      0.98      0.93        49
-
-    accuracy                           0.97      4185
-   macro avg       0.38      0.41      0.36      4185
-weighted avg       0.97      0.97      0.97      4185
+INDEX IDENTIFICATION
+--------------------
+Train on 89661 samples, validate on 22416 samples
+[...]
+Epoch 10/10
+89661/89661 [==============================] - 142s 2ms/step - 
+loss: 0.1739 - acc: 0.9522 - val_loss: 0.1549 - val_acc: 0.9545
 ```
 
 ## pt
-- Latest release: 2019-07-22
-- Training data: [pt_gsd-ud-train.conllu](
-  http://github.com/UniversalDependencies/UD_Portuguese-GSD)
+- Latest release: 2019-07-25
+- Training data: 
+  - CoNLL-U: [pt_gsd-ud-train.conllu](
+    http://github.com/UniversalDependencies/UD_Portuguese-GSD)
+  - UniMorph: [por](https://github.com/unimorph/por)
 - Exceptions dict: None
 
 ```
-Index identification stats (val: 0.2)
------------------------------------------------------
-              precision    recall  f1-score   support
+MODELS CONFIG
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+embedding_1 (Embedding)      (None, 26, 16)            4096      
+_________________________________________________________________
+bidirectional_1 (Bidirection (None, 32)                4224      
+_________________________________________________________________
+dropout_1 (Dropout)          (None, 32)                0         
+_________________________________________________________________
+dense_1 (Dense)              (None, 67)                2211      
+=================================================================
+Total params: 10,531
+Trainable params: 10,531
+Non-trainable params: 0
 
-           0       0.97      0.97      0.97      4286
-           1       0.87      0.87      0.87       852
-           2       0.87      0.89      0.88       627
-           3       0.82      0.91      0.86       341
-           4       0.33      0.12      0.18        40
-           5       0.67      0.17      0.27        12
-           6       0.50      0.09      0.15        11
-           7       0.00      0.00      0.00         3
 
-    accuracy                           0.94      6172
-   macro avg       0.63      0.50      0.52      6172
-weighted avg       0.93      0.94      0.93      6172
+SUFFIX IDENTIFICATION
+---------------------
+Train on 189318 samples, validate on 47330 samples
+[...]
+Epoch 10/10
+189318/189318 [==============================] - 288s 2ms/step - 
+loss: 0.1934 - acc: 0.9474 - val_loss: 0.1693 - val_acc: 0.9521
 
 
-Suffix identification stats (val: 0.2)
------------------------------------------------------
-              precision    recall  f1-score   support
-
-                   0.97      0.98      0.98      4870
-           a       0.00      0.00      0.00         5
-        aber       0.00      0.00      0.00         1
-          ar       0.89      0.80      0.84       165
-        aver       0.00      0.00      0.00         2
-        azer       0.00      0.00      0.00         3
-         car       0.00      0.00      0.00         1
-         cer       0.00      0.00      0.00         0
-         der       0.00      0.00      0.00         1
-           e       0.00      0.00      0.00         3
-       eguir       0.00      0.00      0.00         0
-          el       0.00      0.00      0.00         1
-          er       0.51      0.45      0.48        71
-        erer       0.00      0.00      0.00         1
-        erir       1.00      1.00      1.00         1
-        ever       0.00      0.00      0.00         2
-         ger       0.00      0.00      0.00         0
-          ir       0.54      0.42      0.48        45
-           l       0.85      0.95      0.90        42
-           m       0.89      0.80      0.84        10
-           o       0.89      0.84      0.86       266
-          ol       0.00      0.00      0.00         2
-          or       1.00      0.50      0.67         2
-           r       0.87      0.87      0.87       588
-         rir       0.00      0.00      0.00         2
-         zer       0.00      0.00      0.00         4
-          ão       0.95      1.00      0.97        74
-         çar       0.00      0.00      0.00         1
-          ês       0.83      0.56      0.67         9
-
-    accuracy                           0.95      6172
-   macro avg       0.35      0.32      0.33      6172
-weighted avg       0.94      0.95      0.94      6172
+INDEX IDENTIFICATION
+--------------------
+Train on 189318 samples, validate on 47330 samples
+[...]
+Epoch 10/10
+189318/189318 [==============================] - 289s 2ms/step - 
+loss: 0.1343 - acc: 0.9655 - val_loss: 0.1224 - val_acc: 0.9667
 ```
