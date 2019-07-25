@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='glemmazon',
-      version='0.1',
+      version='0.2',
       description='Simple Python lemmatizer for several languages',
       url='http://github.com/gustavoauma/glemmazon',
       author='Gustavo Mendonça',
@@ -9,22 +9,14 @@ setup(name='glemmazon',
       license='MIT',
       packages=['glemmazon'],
       install_requires=[
-            'absl-py>=0.7.1',
-            'certifi>=2019.6.16',
-            'chardet>=3.0.4',
-            'idna>=2.8',
-            'joblib>=0.13.2',
-            'numpy>=1.16.4',
+            'absl-py==0.7.1',
+            'Keras==2.2.4',
             'pandas==0.24.2',
-            'pyconll>=2.0.0',
-            'python-dateutil>=2.8.0',
-            'pytz>=2019.1',
-            'requests>=2.22.0',
-            'scikit-learn>=0.21.2',
-            'scipy>=1.3.0',
-            'six>=1.12.0',
+            'pyconll==2.0.0',
+            'scikit-learn==0.21.2',
             'sklearn==0.0',
-            'tqdm>=4.32.2',
-            'urllib3>=1.25.3',
+            # TODO(gustavoauma): Find out which tensorflow packages are
+            # actually needed here.
+            'tqdm==4.32.2',
       ],
       zip_safe=False)

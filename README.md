@@ -2,7 +2,11 @@
 Simple Python lemmatizer for several languages
 
 # Installation
-The latest release is available over pip.
+## Requirements
+Note: glemmazon depends on Tensorflow. Please refer to their 
+[installation guide](https://www.tensorflow.org/install/).
+
+The latest version of glemmazon is available over pip.
 ```bash
 $ pip install glemmazon 
 ```
@@ -12,25 +16,24 @@ $ pip install glemmazon
 The main class is [`Lemmatizer`](./glemmazon/lemmatizer.py). It 
 provides a single interface for getting the lemmas, under `__call__`:
 ```python
-from glemmazon import Lemmatizer
-l = Lemmatizer()
-l.load('models/en.pkl')
-l(['loved', 'works', 'cars', 'was'], ['VERB', 'VERB', 'NOUN', 'VERB'])
+>>> from glemmazon import Lemmatizer
+>>> l = Lemmatizer()
+>>> l.load('models/en.pkl')
+>>> l(['loved', 'works', 'cars', 'was'], ['VERB', 'VERB', 'NOUN', 'VERB'])
 ['love', 'work', 'car', 'be']
-
 ```
 
 ## Training a new model
 ### Basic usage
 ```bash
-$ python glemmazon/train.py \
+$ python -m glemmazon.train \
   --conllu data/en_ewt-ud-train.conllu \
   --model models/en.pkl
 ```
 
 ### Include a dictionary with exceptions
 ```bash
-$ python glemmazon/train.py \
+$ python -m glemmazon.train \
   --conllu data/en_ewt-ud-train.conllu \
   --model models/en.pkl \
   --exceptions data/en_exceptions.csv
