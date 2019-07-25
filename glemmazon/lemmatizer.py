@@ -91,7 +91,9 @@ class Lemmatizer(object):
                   pos_to_ix: Dict[str, int],
                   tokenizer: Tokenizer,
                   maxlen: int,
-                  exceptions: Dict[Tuple[str, str], str] = None):
+                  exceptions: Dict[Tuple[str, str], str] = None,
+                  ix_to_suffix: Dict[str, int] = None,
+                  ix_to_index: Dict[str, int] = None):
         self.index_model = index_model
         self.suffix_model = suffix_model
         self.index_to_ix = index_to_ix
@@ -101,8 +103,10 @@ class Lemmatizer(object):
         self.tokenizer = tokenizer
         self.exceptions = exceptions or dict()
 
-        self.ix_to_index = _revert_dictionary(index_to_ix)
-        self.ix_to_suffix = _revert_dictionary(suffix_to_ix)
+        self.ix_to_index = (ix_to_index or
+                            _revert_dictionary(index_to_ix))
+        self.ix_to_suffix = (ix_to_suffix or
+                             _revert_dictionary(suffix_to_ix))
 
     def _lookup(self, word: str, pos: str) -> str:
         return self.exceptions[(word, pos)]
