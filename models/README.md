@@ -42,15 +42,6 @@ Epoch 10/10
 loss: 0.1739 - acc: 0.9522 - val_loss: 0.1549 - val_acc: 0.9545
 ```
 
-## en_large
-- Latest release: 2019-07-25
-- Training data: 
-  - CoNLL-U: [en_ewt-ud-train.conllu](
-    http://github.com/UniversalDependencies/UD_English-EWT)
-  - UniMorph: [eng](https://github.com/unimorph/eng)
-- Exceptions dict: 5,596 (losses from the model)
-- Model config: Same as `en`
-
 ## pt
 - Latest release: 2019-07-25
 - Training data: 
@@ -94,12 +85,3 @@ Epoch 10/10
 189318/189318 [==============================] - 289s 2ms/step - 
 loss: 0.1343 - acc: 0.9655 - val_loss: 0.1224 - val_acc: 0.9667
 ```
-
-## pt_large
-- Latest release: 2019-07-25
-- Training data: 
-  - CoNLL-U: [pt_gsd-ud-train.conllu](
-    http://github.com/UniversalDependencies/UD_Portuguese-GSD)
-  - UniMorph: [por](https://github.com/unimorph/por)
-- Exceptions dict: 13,640 (losses from the model)
-- Model config: Same as `pt`
