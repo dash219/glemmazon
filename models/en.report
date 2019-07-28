@@ -1,0 +1,149 @@
+Reading sentences from CoNLL-U...
+Reading tokens from UniMorph...
+Data sample:
+          lemma  lemma_index lemma_suffix  ...          word word_index  word_suffix
+0   automotives            0               ...   automotives        NaN          NaN
+1  trifurcation            0               ...  trifurcation        NaN          NaN
+2         popup            0               ...         popup        NaN          NaN
+3         groom            0               ...         groom        NaN          NaN
+4        scroll            0               ...        scroll        NaN          NaN
+
+[5 rows x 7 columns]
+Preparing lists of tags/labels...
+Splitting between training and test...
+Converting chars to integers...
+Preparing validation data...
+(22318, 10, 102) (22318, 88) (22318, 9)
+Preparing batch generators...
+Building suffix model...
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+bidirectional_1 (Bidirection (None, 32)                15232     
+_________________________________________________________________
+dropout_1 (Dropout)          (None, 32)                0         
+_________________________________________________________________
+dense_1 (Dense)              (None, 88)                2904      
+=================================================================
+Total params: 18,136
+Trainable params: 18,136
+Non-trainable params: 0
+_________________________________________________________________
+Epoch 1/25
+ - 101s - loss: 0.3815 - acc: 0.9058 - val_loss: 0.2456 - val_acc: 0.9334
+Epoch 2/25
+ - 102s - loss: 0.2185 - acc: 0.9437 - val_loss: 0.1735 - val_acc: 0.9628
+Epoch 3/25
+ - 102s - loss: 0.1685 - acc: 0.9632 - val_loss: 0.1447 - val_acc: 0.9686
+Epoch 4/25
+ - 101s - loss: 0.1477 - acc: 0.9674 - val_loss: 0.1284 - val_acc: 0.9711
+Epoch 5/25
+ - 102s - loss: 0.1335 - acc: 0.9695 - val_loss: 0.1168 - val_acc: 0.9725
+Epoch 6/25
+ - 102s - loss: 0.1206 - acc: 0.9714 - val_loss: 0.1045 - val_acc: 0.9733
+Epoch 7/25
+ - 103s - loss: 0.1116 - acc: 0.9730 - val_loss: 0.0972 - val_acc: 0.9750
+Epoch 8/25
+ - 102s - loss: 0.1047 - acc: 0.9742 - val_loss: 0.0908 - val_acc: 0.9753
+Epoch 9/25
+ - 102s - loss: 0.0977 - acc: 0.9754 - val_loss: 0.0888 - val_acc: 0.9764
+Epoch 10/25
+ - 102s - loss: 0.0926 - acc: 0.9759 - val_loss: 0.0806 - val_acc: 0.9784
+Epoch 11/25
+ - 102s - loss: 0.0885 - acc: 0.9772 - val_loss: 0.0775 - val_acc: 0.9788
+Epoch 12/25
+ - 103s - loss: 0.0843 - acc: 0.9780 - val_loss: 0.0756 - val_acc: 0.9781
+Epoch 13/25
+ - 102s - loss: 0.0817 - acc: 0.9786 - val_loss: 0.0719 - val_acc: 0.9802
+Epoch 14/25
+ - 102s - loss: 0.0791 - acc: 0.9791 - val_loss: 0.0675 - val_acc: 0.9814
+Epoch 15/25
+ - 102s - loss: 0.0762 - acc: 0.9799 - val_loss: 0.0657 - val_acc: 0.9819
+Epoch 16/25
+ - 102s - loss: 0.0744 - acc: 0.9804 - val_loss: 0.0643 - val_acc: 0.9819
+Epoch 17/25
+ - 102s - loss: 0.0726 - acc: 0.9808 - val_loss: 0.0624 - val_acc: 0.9823
+Epoch 18/25
+ - 105s - loss: 0.0705 - acc: 0.9812 - val_loss: 0.0585 - val_acc: 0.9828
+Epoch 19/25
+ - 104s - loss: 0.0695 - acc: 0.9817 - val_loss: 0.0591 - val_acc: 0.9832
+Epoch 20/25
+ - 102s - loss: 0.0677 - acc: 0.9820 - val_loss: 0.0562 - val_acc: 0.9840
+Epoch 21/25
+ - 102s - loss: 0.0656 - acc: 0.9826 - val_loss: 0.0558 - val_acc: 0.9844
+Epoch 22/25
+ - 102s - loss: 0.0649 - acc: 0.9827 - val_loss: 0.0536 - val_acc: 0.9853
+Epoch 23/25
+ - 103s - loss: 0.0638 - acc: 0.9827 - val_loss: 0.0531 - val_acc: 0.9849
+Epoch 24/25
+ - 102s - loss: 0.0627 - acc: 0.9835 - val_loss: 0.0511 - val_acc: 0.9861
+Epoch 25/25
+ - 102s - loss: 0.0614 - acc: 0.9836 - val_loss: 0.0507 - val_acc: 0.9862
+Building index model...
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+bidirectional_2 (Bidirection (None, 32)                15232     
+_________________________________________________________________
+dropout_2 (Dropout)          (None, 32)                0         
+_________________________________________________________________
+dense_2 (Dense)              (None, 9)                 297       
+=================================================================
+Total params: 15,529
+Trainable params: 15,529
+Non-trainable params: 0
+_________________________________________________________________
+Epoch 1/25
+ - 104s - loss: 0.4371 - acc: 0.8601 - val_loss: 0.2787 - val_acc: 0.9150
+Epoch 2/25
+ - 102s - loss: 0.2565 - acc: 0.9249 - val_loss: 0.2018 - val_acc: 0.9419
+Epoch 3/25
+ - 102s - loss: 0.2098 - acc: 0.9412 - val_loss: 0.1694 - val_acc: 0.9487
+Epoch 4/25
+ - 103s - loss: 0.1813 - acc: 0.9482 - val_loss: 0.1459 - val_acc: 0.9574
+Epoch 5/25
+ - 102s - loss: 0.1603 - acc: 0.9550 - val_loss: 0.1334 - val_acc: 0.9603
+Epoch 6/25
+ - 102s - loss: 0.1476 - acc: 0.9578 - val_loss: 0.1253 - val_acc: 0.9620
+Epoch 7/25
+ - 102s - loss: 0.1392 - acc: 0.9601 - val_loss: 0.1172 - val_acc: 0.9648
+Epoch 8/25
+ - 102s - loss: 0.1323 - acc: 0.9620 - val_loss: 0.1134 - val_acc: 0.9650
+Epoch 9/25
+ - 102s - loss: 0.1269 - acc: 0.9631 - val_loss: 0.1060 - val_acc: 0.9669
+Epoch 10/25
+ - 103s - loss: 0.1224 - acc: 0.9639 - val_loss: 0.1005 - val_acc: 0.9683
+Epoch 11/25
+ - 93s - loss: 0.1187 - acc: 0.9647 - val_loss: 0.0999 - val_acc: 0.9681
+Epoch 12/25
+ - 90s - loss: 0.1144 - acc: 0.9663 - val_loss: 0.0947 - val_acc: 0.9695
+Epoch 13/25
+ - 91s - loss: 0.1119 - acc: 0.9666 - val_loss: 0.0948 - val_acc: 0.9698
+Epoch 14/25
+ - 90s - loss: 0.1088 - acc: 0.9675 - val_loss: 0.0902 - val_acc: 0.9707
+Epoch 15/25
+ - 90s - loss: 0.1064 - acc: 0.9677 - val_loss: 0.0883 - val_acc: 0.9711
+Epoch 16/25
+ - 100s - loss: 0.1037 - acc: 0.9687 - val_loss: 0.0869 - val_acc: 0.9717
+Epoch 17/25
+ - 102s - loss: 0.1023 - acc: 0.9691 - val_loss: 0.0860 - val_acc: 0.9722
+Epoch 18/25
+ - 104s - loss: 0.1000 - acc: 0.9692 - val_loss: 0.0830 - val_acc: 0.9733
+Epoch 19/25
+ - 104s - loss: 0.0988 - acc: 0.9701 - val_loss: 0.0829 - val_acc: 0.9729
+Epoch 20/25
+ - 103s - loss: 0.0951 - acc: 0.9706 - val_loss: 0.0830 - val_acc: 0.9737
+Epoch 21/25
+ - 102s - loss: 0.0940 - acc: 0.9709 - val_loss: 0.0793 - val_acc: 0.9737
+Epoch 22/25
+ - 102s - loss: 0.0923 - acc: 0.9713 - val_loss: 0.0779 - val_acc: 0.9741
+Epoch 23/25
+ - 102s - loss: 0.0916 - acc: 0.9717 - val_loss: 0.0782 - val_acc: 0.9742
+Epoch 24/25
+ - 102s - loss: 0.0891 - acc: 0.9721 - val_loss: 0.0756 - val_acc: 0.9755
+Epoch 25/25
+ - 102s - loss: 0.0883 - acc: 0.9725 - val_loss: 0.0768 - val_acc: 0.9744
+Persisting the model...
+Adding losses to the dictionary with exceptions...
+# Exceptions added: 3658
+Model successfully saved in: models/en.pkl.

@@ -1,54 +1,48 @@
 # Models
-## en
-- Latest release: 2019-07-25
+
+## Lemmatizer
+### en
+- Latest release: 2019-07-29
 - Training data: 
   - CoNLL-U: [en_ewt-ud-train.conllu](
     http://github.com/UniversalDependencies/UD_English-EWT)
   - UniMorph: [eng](https://github.com/unimorph/eng)
-- Exceptions dict: [en_exceptions.csv](../data/en_exceptions.csv)
+- Exceptions dict: 3,658 entries (from --no_losses)
 
 ```
 MODELS CONFIG
 _________________________________________________________________
 Layer (type)                 Output Shape              Param #   
 =================================================================
-embedding_1 (Embedding)      (None, 27, 16)            4096      
-_________________________________________________________________
-bidirectional_1 (Bidirection (None, 32)                4224      
+bidirectional_1 (Bidirection (None, 32)                15232     
 _________________________________________________________________
 dropout_1 (Dropout)          (None, 32)                0         
 _________________________________________________________________
-dense_1 (Dense)              (None, 89)                2937      
+dense_1 (Dense)              (None, 88)                2904      
 =================================================================
-Total params: 11,257
-Trainable params: 11,257
+Total params: 18,136
+Trainable params: 18,136
 Non-trainable params: 0
 
 
-SUFFIX IDENTIFICATION
+SUFFIX IDENTIFICATION (val: 0.2 = 22,318 examples)
 ---------------------
-Train on 89661 samples, validate on 22416 samples
-[...]
-Epoch 10/10
-89661/89661 [==============================] - 142s 2ms/step - 
-loss: 0.1739 - acc: 0.9522 - val_loss: 0.1549 - val_acc: 0.9545
+Epoch 25/25
+ - 102s - loss: 0.0614 - acc: 0.9836 - val_loss: 0.0507 - val_acc: 0.9862
 
-INDEX IDENTIFICATION
+INDEX IDENTIFICATION (val: 0.2 = 22,318 examples)
 --------------------
-Train on 89661 samples, validate on 22416 samples
-[...]
-Epoch 10/10
-89661/89661 [==============================] - 142s 2ms/step - 
-loss: 0.1739 - acc: 0.9522 - val_loss: 0.1549 - val_acc: 0.9545
+Epoch 25/25
+ - 102s - loss: 0.0883 - acc: 0.9725 - val_loss: 0.0768 - val_acc: 0.9744
 ```
 
-## pt
-- Latest release: 2019-07-25
+### pt
+- Latest release: 2019-07-29
 - Training data: 
   - CoNLL-U: [pt_gsd-ud-train.conllu](
     http://github.com/UniversalDependencies/UD_Portuguese-GSD)
   - UniMorph: [por](https://github.com/unimorph/por)
-- Exceptions dict: None
+- Exceptions dict: 6,041 entries (from --no_losses)
 
 ```
 MODELS CONFIG
@@ -68,20 +62,13 @@ Trainable params: 10,531
 Non-trainable params: 0
 
 
-SUFFIX IDENTIFICATION
+SUFFIX IDENTIFICATION (val: 0.2 = 48,468 examples)
 ---------------------
-Train on 189318 samples, validate on 47330 samples
-[...]
-Epoch 10/10
-189318/189318 [==============================] - 288s 2ms/step - 
-loss: 0.1934 - acc: 0.9474 - val_loss: 0.1693 - val_acc: 0.9521
+Epoch 25/25
+ - 216s - loss: 0.0657 - acc: 0.9816 - val_loss: 0.0539 - val_acc: 0.9843
 
-
-INDEX IDENTIFICATION
+INDEX IDENTIFICATION (val: 0.2 = 48,468 examples)
 --------------------
-Train on 189318 samples, validate on 47330 samples
-[...]
-Epoch 10/10
-189318/189318 [==============================] - 289s 2ms/step - 
-loss: 0.1343 - acc: 0.9655 - val_loss: 0.1224 - val_acc: 0.9667
+Epoch 25/25
+ - 209s - loss: 0.0693 - acc: 0.9792 - val_loss: 0.0494 - val_acc: 0.9844
 ```
