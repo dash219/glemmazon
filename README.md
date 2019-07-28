@@ -1,47 +1,77 @@
 # glemmazon
-Simple Python lemmatizer for several languages
+Simple Python lemmatizer and morphological generator for several 
+languages.
+
+![Version](https://img.shields.io/badge/version-0.2-red)
+![Release Status](https://img.shields.io/badge/release-unstable-red)
+![Commit Activity](https://img.shields.io/github/commit-activity/m/gustavoauma/glemmazon)
 
 # Installation
-## Requirements
-Note: glemmazon depends on Tensorflow. Please refer to their 
-[installation guide](https://www.tensorflow.org/install/).
-
 The latest version of glemmazon is available over pip.
 ```bash
 $ pip install glemmazon 
 ```
 
+Note: glemmazon depends on Tensorflow. Please refer to their 
+[installation guide](https://www.tensorflow.org/install/). Other
+dependencies are already included in the pip package.
+
 # Usage
-## Basic
+## Lemmatizer
 The main class is [`Lemmatizer`](./glemmazon/lemmatizer.py). It 
 provides a single interface for getting the lemmas, under `__call__`:
 ```python
 >>> from glemmazon import Lemmatizer
->>> l = Lemmatizer()
->>> l.load('models/en.pkl')
->>> l(['loved', 'works', 'cars', 'was'], ['VERB', 'VERB', 'NOUN', 'VERB'])
-['love', 'work', 'car', 'be']
+>>> lemmatizer = Lemmatizer()
+>>> lemmatizer.load('models/en.pkl')
+>>> lemmatizer('loved', 'VERB')
+'love'
+>>> lemmatizer('cars', 'NOUN')
+'car'
 ```
 
-## Training a new model
-### Basic usage
+### Training a new model
+Basic setup
 ```bash
-$ python -m glemmazon.train \
+$ python -m glemmazon.train_lemmatizer \
   --conllu data/en_ewt-ud-train.conllu \
   --model models/en.pkl
 ```
 
-### Include a dictionary with exceptions
+Include a dictionary with exceptions:
 ```bash
-$ python -m glemmazon.train \
+$ python -m glemmazon.train_lemmatizer \
   --conllu data/en_ewt-ud-train.conllu \
   --model models/en.pkl \
   --exceptions data/en_exceptions.csv
 ```
 
-### Other
-For other options, please see the flags defined in [train.py](
-./glammatizer/train.py).
+For other options, please see the flags defined in 
+[train_lemmatizer.py](./glammatizer/train_lemmatizer.py).
+
+## Inflector
+The main class is [`Inflector`](./glemmazon/inflector.py). It 
+provides a single interface for getting the inflected forms, under 
+`__call__`:
+```python
+>>> from glemmazon import Inflector
+>>> inflector = Inflector()
+>>> inflector.load('models/pt_inflec_md.pkl')
+>>> inflector('amar', aspect='IMP', mood='SUB', number='PLUR', person='3', tense='PAST')
+'amassem'
+```
+
+### Training a new model
+Basic setup
+```bash
+$ python -m glemmazon.train_inflector \
+  --unimorph data/por \
+  --mapping data/tag_mapping.csv \
+  --model models/pt_inflect.pkl
+```
+
+For other options, please see the flags defined in 
+[train_inflector.py](./glammatizer/train_inflector.py).
 
 # License
 Please note that this project contains two different licenses:

@@ -2,7 +2,7 @@
 
 __all__ = ['Lemmatizer']
 
-from typing import Dict, Iterator, List, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 import pickle
@@ -13,25 +13,7 @@ from keras.models import Sequential
 from keras.utils import to_categorical
 
 from glemmazon import preprocess
-from glemmazon import string_ops
-
-
-def _build_index_dict(iterable):
-    index_dict = {}
-    for e in iterable:
-        if e not in index_dict:
-            index_dict[e] = len(index_dict)
-    return index_dict
-
-
-def _encode_labels(labels, labels_dict):
-    return to_categorical(
-        [labels_dict[l] for l in labels],
-        len(labels_dict))
-
-
-def _revert_dictionary(dic):
-    return {val: key for key, val in dic.items()}
+from glemmazon import utils
 
 
 class Lemmatizer(object):
@@ -51,32 +33,22 @@ class Lemmatizer(object):
         self.ix_to_suffix = None
         self.ix_to_index = None
 
-    def __call__(self,
-                 word_list: List[str],
-                 pos_list: List[str]) -> List[str]:
-        lemmas = []
-        # TODO(gustavoauma): Refactor this method. The loop here is
-        # inefficient. This really should take advantage of the fact
-        # that predict() receives an array as input.
-        for word, pos in zip(word_list, pos_list):
-            try:
-                lemmas.append(self._lookup(word, pos))
-            except KeyError:
-                op = next(self._yield_suffix_op([word], [pos]))
-                lemmas.append(string_ops.apply_suffix_op(word, op))
-        return lemmas
-
-    def yield_lemmas(self,
-                     word_list: List[str],
-                     pos_list: List[str]) -> List[str]:
-        for i, op in enumerate(self._yield_suffix_op(word_list,
-                                                     pos_list)):
-            yield string_ops.apply_suffix_op(word_list[i], op)
+    def __call__(self, word: str, pos: str) -> str:
+        try:
+            return self._lookup(word, pos)
+        except KeyError:
+            op = (self._predict_index(word, pos),
+                  self._predict_suffix(word, pos))
+            return utils.apply_suffix_op(word, op)
 
     def load(self, path: str):
         """Load the model from a pickle file."""
         with open(path, 'rb') as reader:
             self.set_model(**pickle.load(reader))
+
+    def load_exceptions(self, path: str):
+        """Load exceptions from a .csv file with "word, pos, lemma"."""
+        self.exceptions = preprocess.exceptions_to_dict(path)
 
     def save(self, path: str):
         """Save the model as a pickle file."""
@@ -104,51 +76,34 @@ class Lemmatizer(object):
         self.exceptions = exceptions or dict()
 
         self.ix_to_index = (ix_to_index or
-                            _revert_dictionary(index_to_ix))
+                            utils.revert_dictionary(index_to_ix))
         self.ix_to_suffix = (ix_to_suffix or
-                             _revert_dictionary(suffix_to_ix))
+                             utils.revert_dictionary(suffix_to_ix))
 
     def _lookup(self, word: str, pos: str) -> str:
         return self.exceptions[(word, pos)]
 
-    def _predict_index(self, word_list: List[str],
-                       pos_list: List[str]):
-        return [self.ix_to_index[vec.argmax()] for vec in
-                self.index_model.predict(self._extract_features(
-                    word_list, pos_list))]
 
-    def _predict_suffix(self,
-                        word_list: List[str],
-                        pos_list: List[str]) -> List[str]:
-        return [self.ix_to_suffix[vec.argmax()] for vec in
-                self.suffix_model.predict(self._extract_features(
-                    word_list, pos_list))]
+    def _predict_index(self, lemma: str, pos: str) -> int:
+        ix_pred = self.index_model.predict(self._extract_features(
+            lemma, pos)).argmax()
+        # Convert to int, as it is originally a string.
+        return int(self.ix_to_index[ix_pred])
 
-    def _yield_suffix_op(self,
-                         word_list: List[str],
-                         pos_list: List[str]) -> Iterator:
-        for op in zip(self._predict_index(word_list, pos_list),
-                      self._predict_suffix(word_list, pos_list)):
-            yield op
+    def _predict_suffix(self, lemma: str, pos: str) -> str:
+        ix_pred = self.suffix_model.predict(self._extract_features(
+            lemma, pos)).argmax()
+        return self.ix_to_suffix[ix_pred]
 
-    def _extract_features(self,
-                          word_list: List[str],
-                          pos_list: List[str]) -> np.array:
+    def _extract_features(self, lemma: str, pos: str) -> np.array:
         """Extract features from a list of words and pos."""
-        word_features = pad_sequences(
-            self.tokenizer.texts_to_sequences(word_list), self.maxlen)
-        pos_features = _encode_labels(pos_list, self.pos_to_ix)
-        return np.concatenate([word_features, pos_features], axis=1)
+        # Convert the morphological tags into vectors.
+        tag_vec = utils.encode_labels([pos], self.pos_to_ix)[0]
+        tag_vecs = np.array([np.repeat([tag_vec], self.maxlen, axis=0)])
 
-    @staticmethod
-    def _validate_attribute(attr, attr_type):
-        if not isinstance(attr, attr_type):
-            raise AttributeError(
-                'Model attribute "%s" does not have type "%s".' % (
-                    attr, attr_type.__name__))
+        # Extract character vectors.
+        char_vecs = pad_sequences([to_categorical(
+            self.tokenizer.texts_to_sequences(lemma),
+            len(self.tokenizer.word_index) + 1)], self.maxlen)
+        return np.concatenate([char_vecs, tag_vecs], axis=2)
 
-    def load_exceptions(self, path: str):
-        self.set_exceptions(preprocess.exceptions_to_dict(path))
-
-    def set_exceptions(self, exceptions: Dict[Tuple[str, str], str]):
-        self.exceptions = exceptions

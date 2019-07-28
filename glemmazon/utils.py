@@ -1,10 +1,18 @@
 """Functions for manipulating string suffixes."""
 
-__all__ = ['apply_suffix_op', 'get_suffix_op']
+__all__ = [
+    'apply_suffix_op',
+    'build_index_dict',
+    'encode_labels',
+    'get_suffix_op',
+    'revert_dictionary'
+]
+
+from typing import Tuple
 
 import os
 
-from typing import Tuple
+from keras.utils import to_categorical
 
 
 def apply_suffix_op(word: str, op: Tuple[int, str]) -> str:
@@ -26,6 +34,19 @@ def apply_suffix_op(word: str, op: Tuple[int, str]) -> str:
         return word[:r_index * (-1)] + suffix
 
 
+def build_index_dict(iterable, unknown='_UNK'):
+    index_dict = {unknown: 0}
+    for e in iterable:
+        if e not in index_dict:
+            index_dict[e] = len(index_dict)
+    return index_dict
+
+
+def encode_labels(labels, labels_dict):
+    return to_categorical([labels_dict[l] for l in labels],
+                          len(labels_dict))
+
+
 def get_suffix_op(a: str, b: str) -> Tuple[int, str]:
     # Case: abc -> abc
     if a == b:
@@ -44,3 +65,7 @@ def get_suffix_op(a: str, b: str) -> Tuple[int, str]:
     else:
         return (len(a) - len(common_prefix),
                 b.replace(common_prefix, '', 1))
+
+
+def revert_dictionary(d):
+    return {v: k for k, v in d.items()}

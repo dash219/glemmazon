@@ -1,6 +1,12 @@
 """Functions for preprocessing data."""
 
-__all__ = ['conllu_to_df', 'exceptions_to_dict', 'unimorph_to_df']
+__all__ = [
+    'add_lemmatizer_info',
+    'add_inflector_info',
+    'conllu_to_df',
+    'exceptions_to_dict',
+    'unimorph_to_df',
+]
 
 from typing import Callable, Dict, Tuple, Set
 
@@ -12,8 +18,8 @@ from pandas import DataFrame
 from pyconll.unit import Token
 
 from glemmazon import cleanup
-from glemmazon import string_ops
 from glemmazon import constants as k
+from glemmazon import utils
 
 # Note: the reason for having a hard-coded dictionary here, instead of
 # reusing the available mapping from UniMorph, is because there are
@@ -37,6 +43,44 @@ _POS_UNIMORPH2UD = {
 }
 
 
+def add_lemmatizer_info(df: DataFrame,
+                        word_col: str = k.WORD_COL,
+                        lemma_col: str = k.LEMMA_COL,
+                        suffix_col: str = k.SUFFIX_COL,
+                        index_col: str = k.INDEX_COL) -> DataFrame:
+    # Extract lemma suffix and r_index
+    idxs = []
+    lemmas = []
+    for row in df.itertuples():
+        op = utils.get_suffix_op(getattr(row, word_col),
+                                 getattr(row, lemma_col))
+        idxs.append(op[0])
+        lemmas.append(op[1])
+
+    df[suffix_col] = lemmas
+    df[index_col] = idxs
+    return df
+
+
+def add_inflector_info(df: DataFrame,
+                        word_col: str = k.WORD_COL,
+                        lemma_col: str = k.LEMMA_COL,
+                        suffix_col: str = k.SUFFIX_COL,
+                        index_col: str = k.INDEX_COL) -> DataFrame:
+    # Extract lemma suffix and r_index
+    idxs = []
+    lemmas = []
+    for row in df.itertuples():
+        op = utils.get_suffix_op(getattr(row, word_col),
+                                 getattr(row, lemma_col))
+        idxs.append(op[0])
+        lemmas.append(op[1])
+
+    df[suffix_col] = lemmas
+    df[index_col] = idxs
+    return df
+
+
 def conllu_to_df(path: str,
                  clean_up: Callable = cleanup.dummy,
                  lemma_suffix_col: str = k.SUFFIX_COL,
@@ -44,7 +88,7 @@ def conllu_to_df(path: str,
     entries = _conllu_to_tokens(path)
     df = DataFrame(entries)
     df = clean_up(df)
-    df = _add_lemma_info(df)
+    df = add_lemmatizer_info(df)
 
     # Exclude inflection patterns that occur only once.
     df = df.groupby(lemma_suffix_col).filter(
@@ -61,24 +105,48 @@ def exceptions_to_dict(path: str) -> Dict[Tuple[str,str], str]:
 
 
 def unimorph_to_df(path: str,
-                   clean_up: Callable = cleanup.dummy,
-                   lemma_suffix_col: str = k.SUFFIX_COL,
-                   min_count: int = 3) -> DataFrame:
+                   mapping_path: str,
+                   clean_up: Callable = None,
+                   lemmatizer_cols: bool = True,
+                   inflector_cols: bool = True,
+                   unknown: str = '_UNK',
+                   ) -> DataFrame:
+    """Read a UniMorph file as a DataFrame."""
     df = pd.read_csv(path, delimiter='\t', names=[
         k.LEMMA_COL, k.WORD_COL, k.MORPH_FEATURES_COL],
                      keep_default_na=False)
 
-    df[k.POS_COL] = df[k.MORPH_FEATURES_COL].apply(
-        lambda x: _POS_UNIMORPH2UD[x.split(';')[0]])
+    # Adapt UniMorph tags to UniversalDependency.
+    #
+    # Note: it is actually much faster to build a new DataFrame, than
+    # modifying existing one in-place.
+    if mapping_path:
+        mapping_df = pd.read_csv(mapping_path)
+        mapping_df = mapping_df.set_index('unimorph')
+        entries = []
+        for _, row in tqdm.tqdm(df.iterrows()):
+            entry_feats = {'lemma': row['lemma'], 'word': row['word']}
+            for morph_tag in row[k.MORPH_FEATURES_COL].split(';'):
+                mapping_df.loc[morph_tag].to_list()
+                ud_feature, ud_tag = mapping_df.loc[morph_tag].to_list()
+                entry_feats[ud_feature] = ud_tag.upper()
+            entries.append(entry_feats)
+        df = pd.DataFrame(entries)
 
-    df = df.drop(k.MORPH_FEATURES_COL, axis=1)
+    if clean_up:
+        df = clean_up(df)
 
-    df = clean_up(df)
-    df = _add_lemma_info(df)
+    if lemmatizer_cols:
+        df = add_lemmatizer_info(df)
 
-    # Exclude inflection patterns that occur only once.
-    df = df.groupby(lemma_suffix_col).filter(
-        lambda r: r[lemma_suffix_col].count() > min_count)
+    if inflector_cols:
+        # Fields are intentionally opposite.
+        df = add_lemmatizer_info(
+            df, word_col=k.LEMMA_COL, lemma_col=k.WORD_COL,
+            suffix_col=k.WORD_SUFFIX_COL, index_col=k.WORD_INDEX_COL)
+
+    if unknown:
+        df = df.fillna(unknown)
 
     return df
 
@@ -86,25 +154,6 @@ def unimorph_to_df(path: str,
 class _HashableDict(dict):
     def __hash__(self):
         return hash(tuple(sorted(self.items())))
-
-
-def _add_lemma_info(df: DataFrame,
-                    word_col: str = k.WORD_COL,
-                    lemma_col: str = k.LEMMA_COL,
-                    lemma_suffix_col: str = k.SUFFIX_COL,
-                    lemma_index_col: str = k.INDEX_COL) -> DataFrame:
-    # Extract lemma suffix and r_index
-    idxs = []
-    lemmas = []
-    for row in df.itertuples():
-        op = string_ops.get_suffix_op(getattr(row, word_col),
-                                      getattr(row, lemma_col))
-        idxs.append(op[0])
-        lemmas.append(op[1])
-
-    df[lemma_suffix_col] = lemmas
-    df[lemma_index_col] = idxs
-    return df
 
 
 def _conllu_to_tokens(path: str) -> Set[Dict[str, str]]:
