@@ -47,6 +47,7 @@ AB,degree,Abs
 CMPR,degree,Cmp
 EQT,degree,Equ
 RL,degree,Sup
+SPRL,degree,Sup
 IND,mood,Ind
 IMP,mood,Imp
 COND,mood,Cnd
@@ -110,3 +111,4 @@ NUM,pos,NUM
 PROPN,pos,PROPN
 PART,pos,PART
 INTJ,pos,INTJ
+PTCP,pos,VERB

@@ -21,27 +21,6 @@ from glemmazon import cleanup
 from glemmazon import constants as k
 from glemmazon import utils
 
-# Note: the reason for having a hard-coded dictionary here, instead of
-# reusing the available mapping from UniMorph, is because there are
-# ambiguous cases, e.g. 'V' (unimorph) -> 'AUX,VERB' (UD); and we need
-# to set explicit preferences.
-_POS_UNIMORPH2UD = {
-    'ADV': 'ADV',
-    'PRO': 'PRON',
-    'V': 'VERB',
-    'ADP': 'ADP',
-    'DET': 'DET',
-    'N': 'NOUN',
-    'ADJ': 'ADJ',
-    'CONJ': 'CCONJ',
-    'PUNCT': 'X',
-    'NUM': 'NUM',
-    'PROPN': 'PROPN',
-    'PART': 'PART',
-    'INTJ': 'INTJ',
-    'V.PTCP': 'VERB',
-}
-
 
 def add_lemmatizer_info(df: DataFrame,
                         word_col: str = k.WORD_COL,
@@ -107,8 +86,8 @@ def exceptions_to_dict(path: str) -> Dict[Tuple[str,str], str]:
 def unimorph_to_df(path: str,
                    mapping_path: str,
                    clean_up: Callable = None,
-                   lemmatizer_cols: bool = True,
-                   inflector_cols: bool = True,
+                   lemmatizer_cols: bool = False,
+                   inflector_cols: bool = False,
                    unknown: str = '_UNK',
                    ) -> DataFrame:
     """Read a UniMorph file as a DataFrame."""
@@ -118,8 +97,8 @@ def unimorph_to_df(path: str,
 
     # Adapt UniMorph tags to UniversalDependency.
     #
-    # Note: it is actually much faster to build a new DataFrame, than
-    # modifying existing one in-place.
+    # Note: it is actually much faster to build a new DataFrame, in
+    # comparison with modifying an existing one in-place.
     if mapping_path:
         mapping_df = pd.read_csv(mapping_path)
         mapping_df = mapping_df.set_index('unimorph')

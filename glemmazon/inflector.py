@@ -2,20 +2,19 @@
 
 __all__ = ['Inflector']
 
-from typing import Dict
+from typing import Dict, Tuple
 
+import os
 import re
 
 import numpy as np
 import pickle
 
-from keras.models import Sequential
-from keras.preprocessing.sequence import pad_sequences
-from keras.preprocessing.text import Tokenizer
-from keras.utils import to_categorical
+from tensorflow.keras.models import load_model, Model
 from pandas import DataFrame
 
 from glemmazon import constants as k
+from glemmazon.encoder import DictFeatureEncoder, DictLabelEncoder
 from glemmazon import utils
 
 
@@ -31,62 +30,50 @@ class Inflector(object):
 
     def __init__(self):
         """Initialize the class."""
-        self.index_model = None
-        self.suffix_model = None
-        self.index_to_ix = None
-        self.suffix_to_ix = None
-        self.feature_to_ix = None
+        self.model = None
+        self.feature_enc = None
+        self.label_enc = None
+        self.exceptions = None or DataFrame()
 
-        self.maxlen = None
-        self.tokenizer = None
-        self.exceptions = None
-
-        self.ix_to_suffix = None
-        self.ix_to_index = None
-
-    def __call__(self, lemma: str, **kwargs) -> str:
+    def __call__(self, lemma: str, **kwargs: str) -> str:
         try:
-            return self._lookup(lemma, **kwargs)
+            raise KeyError
         # TODO(gustavoauma): Make this exception less broad.
-        except IndexError:
-            op = (self._predict_index(lemma, **kwargs),
-                  self._predict_suffix(lemma, **kwargs))
-            return utils.apply_suffix_op(lemma, op)
+        except (IndexError, KeyError):
+            return utils.apply_suffix_op(lemma, self._predict_op(
+                lemma, **kwargs))
 
-    def load(self, path: str):
-        """Load the model from a pickle file."""
-        with open(path, 'rb') as reader:
-            self.set_model(**pickle.load(reader))
+    def load(self, folder: str):
+        """Load the model from a folder."""
+        with open(os.path.join(folder, k.PARAMS_FILE), 'rb') as reader:
+            self.set_model(**{
+                **{'model': load_model(
+                    os.path.join(folder, k.MODEL_FILE))},
+                **pickle.load(reader)})
 
-    def save(self, path: str):
-        """Save the model as a pickle file."""
-        with open(path, 'wb') as writer:
-            pickle.dump(self.__dict__, writer)
+    def save(self, folder: str):
+        """Save the model to a folder."""
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+        self.model.save(os.path.join(folder, k.MODEL_FILE))
+        with open(os.path.join(folder, k.PARAMS_FILE), 'wb') as writer:
+            pickle.dump({
+                'exceptions': self.exceptions,
+                'feature_enc': self.feature_enc,
+                'label_enc': self.label_enc,
+            }, writer)
 
     def set_model(self,
-                  index_model: Sequential,
-                  suffix_model: Sequential,
-                  index_to_ix: Dict[str, int],
-                  suffix_to_ix: Dict[str, int],
-                  feature_to_ix: Dict[str, Dict[str, int]],
-                  tokenizer: Tokenizer,
-                  maxlen: int,
-                  exceptions: DataFrame = None,
-                  ix_to_suffix: Dict[str, int] = None,
-                  ix_to_index: Dict[str, int] = None):
-        self.index_model = index_model
-        self.suffix_model = suffix_model
-        self.index_to_ix = index_to_ix
-        self.suffix_to_ix = suffix_to_ix
-        self.feature_to_ix = feature_to_ix
-        self.maxlen = maxlen
-        self.tokenizer = tokenizer
-        self.exceptions = exceptions
-
-        self.ix_to_index = (ix_to_index or
-                            utils.revert_dictionary(index_to_ix))
-        self.ix_to_suffix = (ix_to_suffix or
-                             utils.revert_dictionary(suffix_to_ix))
+                  model: Model,
+                  feature_enc: DictFeatureEncoder,
+                  label_enc: DictLabelEncoder,
+                  exceptions: Dict[Tuple[str, str], str] = None):
+        self.model = model
+        self.feature_enc = feature_enc
+        self.label_enc = label_enc
+        self.exceptions = (exceptions if not exceptions.empty else
+                           DataFrame(columns=feature_enc.scope | {
+                           k.WORD_COL}))
 
     def _lookup(self, lemma: str, **kwargs) -> str:
         try:
@@ -94,49 +81,23 @@ class Inflector(object):
                 lemma, **kwargs)).iloc[0].values[0]
         except IndexError:
             raise IndexError(
-                "Could not find entry in the exceptions '%s' (%s)" %
+                "Could not find entry in the exceptions for '%s' (%s)" %
                 (lemma, kwargs))
 
-    def _predict_index(self, lemma: str,
-                       **kwargs) -> int:
-        ix_pred = self.index_model.predict(self._extract_features(
-            lemma, **kwargs)).argmax()
-        # Convert to int, as it is originally a string.
-        return int(self.ix_to_index[ix_pred])
+    def _predict_op(self,
+                    lemma: str,
+                    fill_na=False,
+                    **kwargs: str) -> Tuple[int, str]:
+        if fill_na:
+            for feature in self.feature_enc.scope:
+                if feature != k.LEMMA_COL and feature not in kwargs:
+                    kwargs[feature] = k.UNKNOWN_TAG
 
-    def _predict_suffix(self,
-                        lemma: str,
-                        **kwargs) -> str:
-        ix_pred = self.suffix_model.predict(self._extract_features(
-            lemma, **kwargs)).argmax()
-        return self.ix_to_suffix[ix_pred]
-
-    def _extract_features(self, lemma: str,
-                          unknown=k.UNKNOWN_TAG,
-                          **kwargs) -> np.array:
-        """Extract features from a list of words and pos."""
-        # TODO(gustavoauma): Check that this assertion is not too slow.
-        # If slow, explicitly define the arguments for each language, 
-        # instead of using kwargs.
-        assert set(kwargs).issubset(self.feature_to_ix)
-
-        # Convert the morphological tags into vectors.
-        tag_vec = []
-        for tag, ix in self.feature_to_ix.items():
-            if tag in kwargs:
-                tag_value = kwargs[tag]
-            else:
-                tag_value = unknown
-            tag_vec.extend(utils.encode_labels([
-                tag_value], self.feature_to_ix[tag])[0])
-
-        tag_vecs = np.array([np.repeat([tag_vec], self.maxlen, axis=0)])
-
-        # Extract character vectors.
-        char_vecs = pad_sequences([to_categorical(
-            self.tokenizer.texts_to_sequences(lemma),
-            len(self.tokenizer.word_index) + 1)], self.maxlen)
-        return np.concatenate([char_vecs, tag_vecs], axis=2)
+        features = [self.feature_enc({k.LEMMA_COL: lemma, **kwargs})]
+        y_pred_dict = self.label_enc.decode(self.model.predict(
+            np.array(features)))
+        return int(y_pred_dict[k.WORD_INDEX_COL]), y_pred_dict[
+            k.WORD_SUFFIX_COL]
 
     def load_exceptions(self, df: DataFrame):
         self.validate_exceptions(df)

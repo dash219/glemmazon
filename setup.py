@@ -11,13 +11,12 @@ setup(name='glemmazon',
       packages=['glemmazon'],
       install_requires=[
             'absl-py==0.7.1',
-            'Keras==2.2.4',
+            'numpy==1.16.4',
             'pandas==0.24.2',
             'pyconll==2.0.0',
             'scikit-learn==0.21.2',
             'sklearn==0.0',
-            # TODO(gustavoauma): Find out which tensorflow packages are
-            # actually needed here.
+            'tensorflow==2.0.0-beta1',
             'tqdm==4.32.2',
       ],
       zip_safe=False)

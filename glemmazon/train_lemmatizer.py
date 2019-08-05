@@ -3,38 +3,47 @@ r"""Module for training a new model of the lemmatizer.
 Basic usage:
 python -m glemmazon.train_lemmatizer \
   --conllu data/en_ewt-ud-train.conllu \
-  --model models/en.pkl
+  --model models/lemmatizer/en
 
-Include a dictionary with exceptions:
+Combine CoNLL-U and UniMorph data:
 python -m glemmazon.train_lemmatizer \
   --conllu data/en_ewt-ud-train.conllu \
-  --model models/en.pkl \
-  --exceptions data/en_exceptions.csv
+  --unimorph data/eng \
+  --mapping data/tag_mapping.csv \
+  --model models/lemmatizer/en
 """
-from typing import Dict
-
+import os
 import logging
 import sys
 
-import numpy as np
 import pandas as pd
 import pickle
+import numpy as np
 import tqdm
 
 from absl import app
 from absl import flags
+
 from sklearn.model_selection import train_test_split
-from keras.layers import Dense, Dropout, LSTM, Bidirectional
-from keras.models import Sequential
-from keras.preprocessing.sequence import pad_sequences
-from keras.preprocessing.text import Tokenizer
-from keras.utils import to_categorical
-from tensorflow.python.keras.utils import Sequence
+from tensorflow.keras.layers import (
+    Dense,
+    Dropout,
+    Input,
+    LSTM,
+    Bidirectional)
+from tensorflow.keras.models import Sequential, Model
 
 from glemmazon import cleanup
-from glemmazon import constants as k
+from glemmazon import constants as k_
 from glemmazon import preprocess
 from glemmazon import utils
+from glemmazon.encoder import (
+    DenseTag,
+    DictFeatureEncoder,
+    DictLabelEncoder,
+    LabelEncoder,
+    SeqFeatureEncoder,
+    SeqWordSuffix)
 from glemmazon.lemmatizer import Lemmatizer
 
 FLAGS = flags.FLAGS
@@ -57,7 +66,6 @@ flags.DEFINE_string("cleanup_unimorph", "dummy",
 flags.DEFINE_integer("min_count", 3,
                      "The minimum number of counts a lemma suffix need "
                      "to have for it to be included for training.")
-
 flags.DEFINE_integer("max_features", 256,
                      "The maximum number of characters to be "
                      "considered in the vocabulary.")
@@ -76,116 +84,78 @@ flags.mark_flag_as_required('model')
 logger = logging.getLogger(__name__)
 
 
-def _build_model(input_shape, labels):
-    model = Sequential()
-    model.add(Bidirectional(LSTM(16), input_shape=input_shape))
-    model.add(Dropout(0.3))
-    model.add(Dense(len(labels), activation='softmax'))
+def _build_encoders(df):
+    ch_list = {ch for word in df.word.apply(lambda x: list(x))
+               for ch in word}
+    sfe = SeqFeatureEncoder(
+        seq_name='word',
+        seq_encoder=SeqWordSuffix(ch_list, suffix_length=6),
+        dense_encoders=DictFeatureEncoder({'pos': DenseTag(
+            df.pos.unique())}))
 
-    model.compile('adam', 'categorical_crossentropy',
-                  metrics=['accuracy'])
-    model.summary()
-    return model
+    label_encoders = {
+        'lemma_suffix': LabelEncoder(df.lemma_suffix.unique()),
+        'lemma_index': LabelEncoder(df.lemma_index.unique()),
+    }
+    dle = DictLabelEncoder(label_encoders)
 
-
-# noinspection PyPep8Naming
-class batch_generator(Sequence):
-    def __init__(self, df, pos_to_ix, label_to_ix, tokenizer,
-                 col_name, batch_size):
-        self.df = df.sample(frac=1).reset_index(drop=True)
-        self.pos_to_ix = pos_to_ix
-        self.label_to_ix = label_to_ix
-        self.tokenizer = tokenizer
-        self.col_name = col_name
-        self.batch_size = batch_size
-        self.n = 0
-        self.max = self.__len__()
-
-    def __len__(self):
-        return int(np.ceil(len(self.df) / float(self.batch_size)))
-
-    def __getitem__(self, idx):
-        batch_df = self.df[
-                   idx * self.batch_size:(idx + 1) * self.batch_size]
-
-        batch_x = []
-        batch_y = []
-        for _, row in batch_df.iterrows():
-            batch_x.append(_extract_features(row[k.WORD_COL],
-                                             row[k.POS_COL],
-                                             self.pos_to_ix,
-                                             self.tokenizer))
-            batch_y.append(utils.encode_labels([row[self.col_name]],
-                                               self.label_to_ix))
-        return np.concatenate(batch_x), np.concatenate(batch_y)
-
-    def __next__(self):
-        if self.n >= self.max:
-            self.n = 0
-        result = self.__getitem__(self.n)
-        self.n += 1
-        return result
+    return sfe, dle
 
 
-def _extract_features(word: str,
-                      pos: str,
-                      pos_to_ix: Dict[str, str],
-                      tokenizer: Tokenizer) -> np.array:
-    """Extract features from a list of words and pos."""
-    # Convert the morphological tags into vectors.
-    tag_vec = utils.encode_labels([pos], pos_to_ix)[0]
-    tag_vecs = np.array([np.repeat([tag_vec], FLAGS.maxlen, axis=0)])
-
-    # Extract character vectors.
-    char_vecs = pad_sequences(
-        [to_categorical(tokenizer.texts_to_sequences(word),
-                        len(tokenizer.word_index) + 1)], FLAGS.maxlen)
-    return np.concatenate([char_vecs, tag_vecs], axis=2)
-
-
-def _extract_features_df(df, pos_to_ix, tokenizer):
-    features = []
-    for _, row in tqdm.tqdm(df.iterrows()):
-        features.append(_extract_features(
-            row[k.WORD_COL], row[k.POS_COL], pos_to_ix, tokenizer))
-    return np.concatenate(features)
+# TODO(gustavoauma): Subclass layers.Model, like the cool kids.
+def _build_model(input_shape, dle):
+    inputs = Input(shape=input_shape)
+    deep = Bidirectional(LSTM(64))(inputs)
+    deep = Dropout(0.3)(deep)
+    deep = Dense(64)(deep)
+    out_suffix = Dense(dle.encoders['lemma_suffix'].output_shape[0],
+                       activation='softmax', name='lemma_suffix')(deep)
+    out_index = Dense(dle.encoders['lemma_index'].output_shape[0],
+                      activation='softmax', name='lemma_index')(deep)
+    return Model(inputs, [out_suffix, out_index])
 
 
 def _add_losses_as_exceptions(l, df):
     for _, row in tqdm.tqdm(df.iterrows()):
-        lemma_pred = l(row[k.WORD_COL], row[k.POS_COL])
-        if lemma_pred != row[k.LEMMA_COL]:
+        lemma_pred = l(row[k_.WORD_COL], row[k_.POS_COL])
+        if lemma_pred != row[k_.LEMMA_COL]:
             logger.info(
                 'Added exception: "%s" -> "%s" [pred: "%s"]' % (
-                    row[k.WORD_COL], row[k.LEMMA_COL],
+                    row[k_.WORD_COL], row[k_.LEMMA_COL],
                     lemma_pred))
-            l.exceptions[(row[k.WORD_COL], row[k.POS_COL])] = (
-                row[k.LEMMA_COL])
+            l.exceptions[(row[k_.WORD_COL], row[k_.POS_COL])] = (
+                row[k_.LEMMA_COL])
 
 
-# noinspection PyPep8Naming
 def main(_):
     if not FLAGS.conllu and not FLAGS.unimorph:
         sys.exit('At least one of the flags --conllu or --unimorph '
                  'need to be specified.')
+    elif FLAGS.unimorph and not FLAGS.mapping:
+        sys.exit('A mapping file for Unimorph tags need to be '
+                 'defined with the flag --mapping.')
 
     df = pd.DataFrame()
-
     if FLAGS.conllu:
         print('Reading sentences from CoNLL-U...')
         df = df.append(preprocess.conllu_to_df(
             FLAGS.conllu, getattr(cleanup, FLAGS.cleanup_conllu),
             min_count=FLAGS.min_count), sort=True)
-
     if FLAGS.unimorph:
         print('Reading tokens from UniMorph...')
         df = df.append(preprocess.unimorph_to_df(
             FLAGS.unimorph, FLAGS.mapping,
             clean_up=getattr(cleanup, FLAGS.cleanup_unimorph)),
+            lemmatizer_cols=True,
             sort=True)
 
     df.drop_duplicates(inplace=True)
     df.reset_index(drop=True, inplace=True)
+    df[k_.INDEX_COL] = df[k_.INDEX_COL].astype('str')
+
+    # Keep only relevant columns
+    df = df[[k_.WORD_COL, k_.LEMMA_COL, k_.POS_COL, k_.SUFFIX_COL,
+             k_.INDEX_COL]]
 
     # Make a copy of the original DataFrame, without the aggregation, so
     # that exceptions are kept in the data.
@@ -193,60 +163,39 @@ def main(_):
         orig_df = pd.DataFrame(df)
 
     # Exclude inflection patterns that occur only once.
-    df = df.groupby(k.SUFFIX_COL).filter(
-        lambda r: r[k.SUFFIX_COL].count() > FLAGS.min_count)
+    df = df.groupby(k_.SUFFIX_COL).filter(
+        lambda r: r[k_.SUFFIX_COL].count() > FLAGS.min_count)
 
     print('Data sample:')
     print(df.head())
 
-    print('Preparing lists of tags/labels...')
-    suffix_to_ix = utils.build_index_dict(df[k.SUFFIX_COL].unique())
-    index_to_ix = utils.build_index_dict(df[k.INDEX_COL].unique())
-    pos_to_ix = utils.build_index_dict(df.pos.unique())
-
-    print('Splitting between training and test...')
+    print('Splitting between training, test and val...')
     train, test = train_test_split(df, test_size=0.2)
+    print(len(train), 'train examples')
+    print(len(test), 'test examples')
 
-    print('Converting chars to integers...')
-    tokenizer = Tokenizer(num_words=FLAGS.max_features, char_level=True)
-    tokenizer.fit_on_texts(df.word)
+    print('Preparing training data and feature/label encoders...')
+    sfe, dle = _build_encoders(df)
 
-    print('Preparing validation data...')
-    x_val = _extract_features_df(test, pos_to_ix, tokenizer)
-    ys_val = utils.encode_labels(test[k.SUFFIX_COL], suffix_to_ix)
-    yi_val = utils.encode_labels(test[k.INDEX_COL], index_to_ix)
-    print(x_val.shape, ys_val.shape, yi_val.shape)
+    print('Preparing test data...')
+    x_test = np.stack([sfe(dict(r)) for _, r in
+                       test[['word', 'pos']].iterrows()])
+    y_test = [np.vstack(e) for e in
+              zip(*[dle(dict(r)) for _, r in
+                    test[['lemma_suffix', 'lemma_index']].iterrows()])]
+    print(x_test.shape, y_test[0].shape, y_test[1].shape)
 
     print('Preparing batch generators...')
-    ys_train_gen = batch_generator(df, pos_to_ix, suffix_to_ix,
-                                   tokenizer, k.SUFFIX_COL,
-                                   FLAGS.batch_size)
-    yi_train_gen = batch_generator(df, pos_to_ix, index_to_ix,
-                                   tokenizer, k.INDEX_COL,
-                                   FLAGS.batch_size)
+    batch_generator = utils.BatchGenerator(df, sfe, dle)
 
-    print('Building suffix model...')
-    sample_x = _extract_features(test.iloc[0][k.WORD_COL],
-                                 test.iloc[0][k.POS_COL],
-                                 pos_to_ix, tokenizer)
-    input_shape = (FLAGS.maxlen, sample_x.shape[2])
+    print('Building the model...')
+    model = _build_model(sfe.output_shape, dle)
+    model.summary()
 
-    suffix_model = _build_model(input_shape, suffix_to_ix)
-    suffix_model.fit_generator(ys_train_gen,
-                               epochs=FLAGS.epochs,
-                               steps_per_epoch=len(
-                                   df) // FLAGS.batch_size,
-                               verbose=2,
-                               validation_data=[x_val, ys_val])
-
-    print('Building index model...')
-    index_model = _build_model(input_shape, index_to_ix)
-    index_model.fit_generator(yi_train_gen,
-                              epochs=FLAGS.epochs,
-                              steps_per_epoch=len(
-                                  df) // FLAGS.batch_size,
-                              verbose=2,
-                              validation_data=[x_val, yi_val])
+    print('Running training...')
+    model.compile('adam', 'categorical_crossentropy',
+                  metrics=['accuracy'])
+    model.fit_generator(batch_generator, epochs=FLAGS.epochs, verbose=2)
 
     exceptions = {}
     if FLAGS.exceptions:
@@ -254,31 +203,30 @@ def main(_):
         exceptions = preprocess.exceptions_to_dict(FLAGS.exceptions)
 
     print('Persisting the model...')
-    model = {
-        'index_model': index_model,
-        'suffix_model': suffix_model,
-        'suffix_to_ix': suffix_to_ix,
-        'index_to_ix': index_to_ix,
-        'pos_to_ix': pos_to_ix,
-        'tokenizer': tokenizer,
-        'maxlen': FLAGS.maxlen,
-        'exceptions': exceptions,
-    }
+    if not os.path.exists(FLAGS.model):
+        os.mkdir(FLAGS.model)
+    model.save(os.path.join(FLAGS.model, k_.MODEL_FILE))
+    with open(os.path.join(FLAGS.model, k_.PARAMS_FILE),
+              'wb') as writer:
+        pickle.dump({
+            'exceptions': exceptions,
+            'feature_enc': sfe,
+            'label_enc': dle,
+        }, writer)
 
     # Add losses to the exception dictionary, so that they can be
     # labeled correctly, if specified by the caller.
     if FLAGS.no_losses:
         print('Adding losses to the dictionary with exceptions...')
         l = Lemmatizer()
-        l.set_model(**model)
+        l.load(FLAGS.model)
         n_start = len(l.exceptions)
         # noinspection PyUnboundLocalVariable
         _add_losses_as_exceptions(l, orig_df)
         print('# Exceptions added: %d' % (len(l.exceptions) - n_start))
-        model['exceptions'] = l.exceptions
+        l.save(FLAGS.model)
 
-    pickle.dump(model, open(FLAGS.model, 'wb'))
-    print('Model successfully saved in: %s.' % FLAGS.model)
+    print('Model successfully saved in folder: %s.' % FLAGS.model)
 
 
 if __name__ == '__main__':

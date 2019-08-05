@@ -8,11 +8,62 @@ __all__ = [
     'revert_dictionary'
 ]
 
-from typing import Tuple
+from typing import List, Tuple
 
 import os
+import numpy as np
 
-from keras.utils import to_categorical
+from pandas import DataFrame
+
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.utils import to_categorical
+from tensorflow.python.keras.utils import Sequence
+
+from glemmazon.encoder import DictFeatureEncoder, DictLabelEncoder
+
+
+class BatchGenerator(Sequence):
+    def __init__(self,
+                 df: DataFrame,
+                 feature_encoders: DictFeatureEncoder,
+                 label_encoders: DictLabelEncoder,
+                 batch_size=16):
+        # Copy and random sample the dataframe "in-place".
+        # http://stackoverflow.com/q/29576430
+        self.df = df.sample(frac=1).reset_index(drop=True)
+
+        self.feature_encoders = feature_encoders
+        self.label_encoders = label_encoders
+        self.batch_size = batch_size
+
+        self.n = 0
+        self.max = self.__len__()
+
+    def __len__(self):
+        return int(np.ceil(len(self.df) / float(self.batch_size)))
+
+    def __getitem__(self, idx: int) -> Tuple[np.array, List[np.array]]:
+        batch_df = self.df[
+                   idx * self.batch_size:(idx + 1) * self.batch_size]
+
+        batch_x = []
+        batch_y = []
+        for _, row in batch_df.iterrows():
+            row_dict = dict(row)
+            x_dict = {k: v for k, v in row_dict.items() if
+                      k in self.feature_encoders.scope}
+            y_dict = {k: v for k, v in row_dict.items() if
+                      k in self.label_encoders.scope}
+            batch_x.append(self.feature_encoders(x_dict))
+            batch_y.append(self.label_encoders(y_dict))
+        return np.stack(batch_x), [np.vstack(e) for e in zip(*batch_y)]
+
+    def __next__(self):
+        if self.n >= self.max:
+            self.n = 0
+        result = self.__getitem__(self.n)
+        self.n += 1
+        return result
 
 
 def apply_suffix_op(word: str, op: Tuple[int, str]) -> str:
