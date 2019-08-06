@@ -2,7 +2,7 @@
 Simple Python lemmatizer and morphological generator for several 
 languages.
 
-![Version](https://img.shields.io/badge/version-0.2-red)
+![Version](https://img.shields.io/badge/version-0.3-red)
 ![Release Status](https://img.shields.io/badge/release-unstable-red)
 ![Commit Activity](https://img.shields.io/github/commit-activity/m/gustavoauma/glemmazon)
 
