@@ -22,5 +22,24 @@ def en_ewt(df: DataFrame) -> DataFrame:
     return df
 
 
+def basic(df: DataFrame) -> DataFrame:
+    # Filter rows based on the presence of morphological features.
+    for morph_feature in [
+        'abbr', # em (<them)
+        'foreign',  # reunion
+        'typo',  # opinon (<opinion)
+        'numtype',  # 4.5
+    ]:
+        if morph_feature in df.columns:
+            df = df[df[morph_feature].isna()]
+
+    # Filter rows based on POS values.
+    for pos in ['PART', 'SYM', 'PUNCT', 'X']:
+        if pos in df.columns:
+            df = df[~df.pos.isin([pos])]
+
+    return _filter_lemmatizer(df)
+
+
 def dummy(df: DataFrame) -> DataFrame:
     return _filter_lemmatizer(df)

@@ -57,10 +57,10 @@ flags.DEFINE_string("model", None,
 flags.DEFINE_string("exceptions", None,
                     "Path to a CSV with lemma exceptions [columns: "
                     "'word', 'pos', 'lemma'].")
-flags.DEFINE_string("cleanup_conllu", "dummy",
+flags.DEFINE_string("cleanup_conllu", "basic",
                     "Name of the clean-up function to be used. Use "
                     "'dummy' for no clean-up.")
-flags.DEFINE_string("cleanup_unimorph", "dummy",
+flags.DEFINE_string("cleanup_unimorph", "basic",
                     "Name of the clean-up function to be used. Use "
                     "'dummy' for no clean-up.")
 flags.DEFINE_integer("min_count", 3,
@@ -69,7 +69,7 @@ flags.DEFINE_integer("min_count", 3,
 flags.DEFINE_integer("max_features", 256,
                      "The maximum number of characters to be "
                      "considered in the vocabulary.")
-flags.DEFINE_boolean("no_losses", True,
+flags.DEFINE_boolean("no_losses", False,
                      "If True, losses from training data will be added "
                      "to the model's exception dictionary (not to the "
                      ".csv file though).")
@@ -80,8 +80,6 @@ flags.DEFINE_integer("maxlen", 10,
 flags.DEFINE_integer("epochs", 25, "Epochs for training.")
 
 flags.mark_flag_as_required('model')
-
-logger = logging.getLogger(__name__)
 
 
 def _build_encoders(df):
@@ -105,7 +103,7 @@ def _build_encoders(df):
 # TODO(gustavoauma): Subclass layers.Model, like the cool kids.
 def _build_model(input_shape, dle):
     inputs = Input(shape=input_shape)
-    deep = Bidirectional(LSTM(64))(inputs)
+    deep = Bidirectional(LSTM(32))(inputs)
     deep = Dropout(0.3)(deep)
     deep = Dense(64)(deep)
     out_suffix = Dense(dle.encoders['lemma_suffix'].output_shape[0],
@@ -115,7 +113,7 @@ def _build_model(input_shape, dle):
     return Model(inputs, [out_suffix, out_index])
 
 
-def _add_losses_as_exceptions(l, df):
+def _add_losses_as_exceptions(l, df, logger):
     for _, row in tqdm.tqdm(df.iterrows()):
         lemma_pred = l(row[k_.WORD_COL], row[k_.POS_COL])
         if lemma_pred != row[k_.LEMMA_COL]:
@@ -126,6 +124,28 @@ def _add_losses_as_exceptions(l, df):
             l.exceptions[(row[k_.WORD_COL], row[k_.POS_COL])] = (
                 row[k_.LEMMA_COL])
 
+def _get_logger(model):
+    if not os.path.exists(model):
+        os.makedirs(model)
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+
+    # create formatter and add it to the handlers
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # create file handler which logs even debug messages
+    fh = logging.FileHandler(os.path.join(model, k_.LOG_FILE), mode='w')
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    return logger
 
 def main(_):
     if not FLAGS.conllu and not FLAGS.unimorph:
@@ -135,19 +155,21 @@ def main(_):
         sys.exit('A mapping file for Unimorph tags need to be '
                  'defined with the flag --mapping.')
 
+    logger = _get_logger(FLAGS.model)
     df = pd.DataFrame()
     if FLAGS.conllu:
-        print('Reading sentences from CoNLL-U...')
+        logger.info('Reading CoNLL-U sentences from "%s"...' %
+                    FLAGS.conllu)
         df = df.append(preprocess.conllu_to_df(
             FLAGS.conllu, getattr(cleanup, FLAGS.cleanup_conllu),
             min_count=FLAGS.min_count), sort=True)
     if FLAGS.unimorph:
-        print('Reading tokens from UniMorph...')
+        logger.info('Reading UniMorph tokens from "%s"...' %
+                    FLAGS.unimorph)
         df = df.append(preprocess.unimorph_to_df(
             FLAGS.unimorph, FLAGS.mapping,
-            clean_up=getattr(cleanup, FLAGS.cleanup_unimorph)),
-            lemmatizer_cols=True,
-            sort=True)
+            clean_up=getattr(cleanup, FLAGS.cleanup_unimorph),
+            lemmatizer_cols=True), sort=True)
 
     df.drop_duplicates(inplace=True)
     df.reset_index(drop=True, inplace=True)
@@ -166,45 +188,50 @@ def main(_):
     df = df.groupby(k_.SUFFIX_COL).filter(
         lambda r: r[k_.SUFFIX_COL].count() > FLAGS.min_count)
 
-    print('Data sample:')
-    print(df.head())
+    logger.info('Data sample:\n %s' % df.head())
 
-    print('Splitting between training, test and val...')
+    logger.info('Splitting between training, test and val...')
     train, test = train_test_split(df, test_size=0.2)
-    print(len(train), 'train examples')
-    print(len(test), 'test examples')
+    logger.info('# Training examples: %d' % len(train))
+    logger.info('# Test examples: %d' % len(test))
 
-    print('Preparing training data and feature/label encoders...')
+    logger.info('Preparing training data and feature/label encoders...')
     sfe, dle = _build_encoders(df)
 
-    print('Preparing test data...')
+    logger.info('Preparing test data...')
     x_test = np.stack([sfe(dict(r)) for _, r in
                        test[['word', 'pos']].iterrows()])
     y_test = [np.vstack(e) for e in
               zip(*[dle(dict(r)) for _, r in
                     test[['lemma_suffix', 'lemma_index']].iterrows()])]
-    print(x_test.shape, y_test[0].shape, y_test[1].shape)
+    logger.info('x_test shape: %s' % (x_test.shape,))
+    logger.info('y_test[0] shape: %s' % (y_test[0].shape,))
+    logger.info('y_test[1] shape: %s' % (y_test[1].shape,))
 
-    print('Preparing batch generators...')
+    logger.info('Preparing batch generators...')
     batch_generator = utils.BatchGenerator(df, sfe, dle)
 
-    print('Building the model...')
+    logger.info('Building the model...')
     model = _build_model(sfe.output_shape, dle)
-    model.summary()
+    model.summary(print_fn=logger.info)
 
-    print('Running training...')
+    logger.info('Running training...')
     model.compile('adam', 'categorical_crossentropy',
                   metrics=['accuracy'])
-    model.fit_generator(batch_generator, epochs=FLAGS.epochs, verbose=2)
+    history = model.fit_generator(batch_generator, epochs=FLAGS.epochs,
+                                  verbose=2)
+    for i in range(FLAGS.epochs):
+        epoch_metrics = {k: v[i] for k, v in history.history.items()}
+        logger.debug('Epoch %d: %s' % (i+1, sorted(
+            epoch_metrics.items())))
 
     exceptions = {}
     if FLAGS.exceptions:
-        print('Loading exceptions...')
+        logger.info('Loading exceptions...')
         exceptions = preprocess.exceptions_to_dict(FLAGS.exceptions)
 
-    print('Persisting the model...')
-    if not os.path.exists(FLAGS.model):
-        os.mkdir(FLAGS.model)
+    logger.info('Persisting the model...')
+
     model.save(os.path.join(FLAGS.model, k_.MODEL_FILE))
     with open(os.path.join(FLAGS.model, k_.PARAMS_FILE),
               'wb') as writer:
@@ -217,16 +244,16 @@ def main(_):
     # Add losses to the exception dictionary, so that they can be
     # labeled correctly, if specified by the caller.
     if FLAGS.no_losses:
-        print('Adding losses to the dictionary with exceptions...')
+        logger.info('Adding losses to the dictionary with exceptions...')
         l = Lemmatizer()
         l.load(FLAGS.model)
         n_start = len(l.exceptions)
         # noinspection PyUnboundLocalVariable
-        _add_losses_as_exceptions(l, orig_df)
-        print('# Exceptions added: %d' % (len(l.exceptions) - n_start))
+        _add_losses_as_exceptions(l, orig_df, logger)
+        logger.info('# Exceptions added: %d' % (len(l.exceptions) - n_start))
         l.save(FLAGS.model)
 
-    print('Model successfully saved in folder: %s.' % FLAGS.model)
+    logger.info('Model successfully saved in folder: %s.' % FLAGS.model)
 
 
 if __name__ == '__main__':

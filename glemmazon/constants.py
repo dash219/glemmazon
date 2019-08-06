@@ -22,3 +22,4 @@ UNKNOWN_TAG = '_UNK'
 
 PARAMS_FILE = 'params.pkl'
 MODEL_FILE = 'model.h5'
+LOG_FILE = 'train.log'
