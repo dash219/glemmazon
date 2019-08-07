@@ -102,13 +102,13 @@ def _build_model(input_shape, dle):
     deep = Bidirectional(LSTM(64))(inputs)
     deep = Dropout(0.3)(deep)
     deep = Dense(64)(deep)
-    out_suffix = Dense(
-        dle.encoders[k_.WORD_SUFFIX_COL].output_shape[0],
-        activation='softmax', name=k_.WORD_SUFFIX_COL)(deep)
     out_index = Dense(
         dle.encoders[k_.WORD_INDEX_COL].output_shape[0],
         activation='softmax', name=k_.WORD_INDEX_COL)(deep)
-    return Model(inputs, [out_suffix, out_index])
+    out_suffix = Dense(
+        dle.encoders[k_.WORD_SUFFIX_COL].output_shape[0],
+        activation='softmax', name=k_.WORD_SUFFIX_COL)(deep)
+    return Model(inputs, [out_index, out_suffix])
 
 
 def _get_losses_df(inflec, df):

@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
-import os
 import unittest
 
 from glemmazon import Lemmatizer
 
-TEST_DIR = os.getcwd()
-
-# Inflectors
-PT_INFLEC_MD = 'pt_inflec_md.pkl'
-
 # Lemmatizers
-EN_MODEL = 'models/en'
-PT_MODEL = 'models/pt'
-NL_MODEL = 'models/nl'
+EN_MODEL = 'models/lemmatizer/en'
+PT_MODEL = 'models/lemmatizer/pt'
+NL_MODEL = 'models/lemmatizer/nl'
 
 
 class TestModels(unittest.TestCase):

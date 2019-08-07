@@ -92,8 +92,8 @@ def _build_encoders(df):
             df.pos.unique())}))
 
     label_encoders = {
-        'lemma_suffix': LabelEncoder(df.lemma_suffix.unique()),
         'lemma_index': LabelEncoder(df.lemma_index.unique()),
+        'lemma_suffix': LabelEncoder(df.lemma_suffix.unique()),
     }
     dle = DictLabelEncoder(label_encoders)
 
@@ -106,11 +106,11 @@ def _build_model(input_shape, dle):
     deep = Bidirectional(LSTM(32))(inputs)
     deep = Dropout(0.3)(deep)
     deep = Dense(64)(deep)
-    out_suffix = Dense(dle.encoders['lemma_suffix'].output_shape[0],
-                       activation='softmax', name='lemma_suffix')(deep)
     out_index = Dense(dle.encoders['lemma_index'].output_shape[0],
                       activation='softmax', name='lemma_index')(deep)
-    return Model(inputs, [out_suffix, out_index])
+    out_suffix = Dense(dle.encoders['lemma_suffix'].output_shape[0],
+                       activation='softmax', name='lemma_suffix')(deep)
+    return Model(inputs, [out_index, out_suffix])
 
 
 def _add_losses_as_exceptions(l, df, logger):

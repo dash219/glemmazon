@@ -66,7 +66,7 @@ class TestEncoder(unittest.TestCase):
 
         # Note that '_UNK' is [1., 0. , 0., 0.]
         np.testing.assert_array_equal(
-            dict_enc({'word': 'bcc', 'pos': 'NOUN', 'tense': 'FUT'}),
+            dict_enc({'word': 'bcc', 'tense': 'FUT', 'pos': 'NOUN'}),
             np.array([
                 [
                     1., 0., 0., 0., 0.,  # _UNK
@@ -105,11 +105,15 @@ class TestEncoder(unittest.TestCase):
         })
         np.testing.assert_array_equal(
             dict_le({'lemma_suffix': 'ed', 'lemma_index': '2'}),
-            np.array([[0., 1., 0., 0.],
-                      [0., 0., 1., 0.]]))
+            np.array([[0., 0., 1., 0.],
+                      [0., 1., 0., 0.]]))
+        np.testing.assert_array_equal(
+            dict_le({'lemma_index': '2', 'lemma_suffix': 'ed'}),
+            np.array([[0., 0., 1., 0.],
+                      [0., 1., 0., 0.]]))
         self.assertEqual(dict_le.decode(
-            [np.array([0., 1., 0., 0.]),
-             np.array([0., 0., 1., 0.])]),
+            [np.array([0., 0., 1., 0.]),
+             np.array([0., 1., 0., 0.])]),
             {'lemma_suffix': 'ed', 'lemma_index': '2'})
         self.assertCountEqual(dict_le.scope,
                               {'lemma_suffix', 'lemma_index'})

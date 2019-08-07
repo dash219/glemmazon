@@ -105,7 +105,12 @@ class DictFeatureEncoder(FeatureEncoder):
     def __init__(self, encoders: Dict[str, Union[
         DenseTag, DenseWordSuffix]]):
         super(DictFeatureEncoder).__init__()
-        self.encoders = collections.OrderedDict(encoders)
+        self.encoders = collections.OrderedDict()
+
+        # Not ideal, but required for Python 3.5
+        # https://stackoverflow.com/questions/47273260
+        for p_name, encoder in sorted(encoders.items()):
+            self.encoders[p_name] = encoder
         self.scope = set(self.encoders)
 
     def __call__(self, feature_dict: str) -> np.array:
@@ -223,7 +228,11 @@ class LabelEncoder(DenseTag):
 class DictLabelEncoder(LabelEncoder):
     def __init__(self, encoders: Dict[str, LabelEncoder]):
         super(DictLabelEncoder).__init__()
-        self.encoders = collections.OrderedDict(encoders)
+        self.encoders = collections.OrderedDict()
+        # Not ideal, but required for Python 3.5
+        # https://stackoverflow.com/questions/47273260
+        for p_name, encoder in sorted(encoders.items()):
+            self.encoders[p_name] = encoder
         self.scope = set(self.encoders)
 
     def __call__(self, label_dict: str) -> np.array:
