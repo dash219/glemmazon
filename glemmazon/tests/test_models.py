@@ -11,14 +11,11 @@ NL_MODEL = 'models/lemmatizer/nl'
 
 class TestModels(unittest.TestCase):
     def setUp(self):
-        self.l_en = Lemmatizer()
-        self.l_en.load(EN_MODEL)
+        self.l_en = Lemmatizer.load(EN_MODEL)
 
-        self.l_pt = Lemmatizer()
-        self.l_pt.load(PT_MODEL)
+        self.l_pt = Lemmatizer.load(PT_MODEL)
 
-        self.l_nl = Lemmatizer()
-        self.l_nl.load(NL_MODEL)
+        self.l_nl = Lemmatizer.load(NL_MODEL)
 
     def test_en(self):
         self.assertEqual(self.l_en('loves', 'VERB'), 'love')

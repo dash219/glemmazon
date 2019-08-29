@@ -20,12 +20,20 @@ from glemmazon.encoder import DictFeatureEncoder, DictLabelEncoder
 class Lemmatizer(object):
     """Class to represent a lemmatizer."""
 
-    def __init__(self):
-        """Initialize the class."""
-        self.model = None
-        self.feature_enc = None
-        self.label_enc = None
-        self.exceptions = None or dict()
+    def __init__(self,
+                 model: Model,
+                 feature_enc: DictFeatureEncoder,
+                 label_enc: DictLabelEncoder,
+                 exceptions: Dict[Tuple[str, str], str] = None):
+        self.model = model
+        self.feature_enc = feature_enc
+        self.label_enc = label_enc
+        self.exceptions = exceptions or dict()
+
+        # Make a fake first call to predict: the first iteration of
+        # predict() is slower due to caching:
+        # https://stackoverflow.com/questions/55577711
+        self._predict_op('', k.UNKNOWN_TAG)
 
     def __call__(self, word: str, pos: str) -> str:
         try:
@@ -34,25 +42,36 @@ class Lemmatizer(object):
             return utils.apply_suffix_op(word, self._predict_op(
                 word, pos))
 
-    def load(self, folder: str):
-        """Load the model from a folder."""
-        with open(os.path.join(folder, k.PARAMS_FILE), 'rb') as reader:
-            self.set_model(**{
-                **{'model': load_model(
-                    os.path.join(folder, k.MODEL_FILE))},
-                **pickle.load(reader)})
+    def predict(self, instances, **kwargs):
+        labels = []
+        for instance in instances:
+            labels.append(self.__call__(**instance))
+        return labels
+
+    @classmethod
+    def from_path(cls, model_dir: str):
+        """Load the model from a model_dir."""
+        with open(os.path.join(model_dir, k.PARAMS_FILE),
+                  'rb') as reader:
+            return cls(**{**{'model': load_model(
+                os.path.join(model_dir, k.MODEL_FILE))},
+                          **pickle.load(reader)})
+    @classmethod
+    def load(cls, model_dir: str):
+        """Load the model from a model_dir."""
+        return cls.from_path(model_dir)
 
     def load_exceptions(self, path: str):
         """Load exceptions from a .csv file with "word, pos, lemma"."""
         self.exceptions = preprocess.exceptions_to_dict(path)
 
-    def save(self, folder: str):
-        """Save the model to a folder."""
-        if not os.path.exists(folder):
-            os.mkdir(folder)
+    def save(self, model_dir: str):
+        """Save the model to a model_dir."""
+        if not os.path.exists(model_dir):
+            os.mkdir(model_dir)
 
-        self.model.save(os.path.join(folder, k.MODEL_FILE))
-        with open(os.path.join(folder, k.PARAMS_FILE), 'wb') as writer:
+        self.model.save(os.path.join(model_dir, k.MODEL_FILE))
+        with open(os.path.join(model_dir, k.PARAMS_FILE), 'wb') as writer:
             pickle.dump({
                 'exceptions': self.exceptions,
                 'feature_enc': self.feature_enc,

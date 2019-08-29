@@ -22,8 +22,7 @@ The main class is [`Lemmatizer`](./glemmazon/lemmatizer.py). It
 provides a single interface for getting the lemmas, under `__call__`:
 ```python
 >>> from glemmazon import Lemmatizer
->>> lemmatizer = Lemmatizer()
->>> lemmatizer.load('models/en.pkl')
+>>> lemmatizer = Lemmatizer.from_path('models/lemmatizer/en.pkl')
 >>> lemmatizer('loved', 'VERB')
 'love'
 >>> lemmatizer('cars', 'NOUN')
@@ -55,8 +54,7 @@ provides a single interface for getting the inflected forms, under
 `__call__`:
 ```python
 >>> from glemmazon import Inflector
->>> inflector = Inflector()
->>> inflector.load('models/pt_inflec_md.pkl')
+>>> inflector = Inflector.from_path('models/inflector/pt_inflec_md.pkl')
 >>> inflector('amar', aspect='IMP', mood='SUB', number='PLUR', person='3', tense='PAST')
 'amassem'
 ```
