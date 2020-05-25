@@ -113,7 +113,7 @@ class DictFeatureEncoder(FeatureEncoder):
             self.encoders[p_name] = encoder
         self.scope = set(self.encoders)
 
-    def __call__(self, feature_dict: str) -> np.array:
+    def __call__(self, feature_dict: Dict[str, str]) -> np.array:
         if set(feature_dict) != self.scope:
             raise ValueError(
                 'Example tags don\'t match the feature encoders. '
