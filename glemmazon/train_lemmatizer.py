@@ -44,7 +44,7 @@ from glemmazon.encoder import (
     LabelEncoder,
     SeqFeatureEncoder,
     SeqWordSuffix)
-from glemmazon.lemmatizer import Lemmatizer
+from glemmazon.pipeline import Lemmatizer
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("conllu", None, "Path to a CoNLL-U file.")

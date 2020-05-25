@@ -22,7 +22,7 @@ The main class is [`Lemmatizer`](./glemmazon/lemmatizer.py). It
 provides a single interface for getting the lemmas, under `__call__`:
 ```python
 >>> from glemmazon import Lemmatizer
->>> lemmatizer = Lemmatizer.from_path('models/lemmatizer/en.pkl')
+>>> lemmatizer = Lemmatizer.load('models/lemmatizer/en')
 >>> lemmatizer('loved', 'VERB')
 'love'
 >>> lemmatizer('cars', 'NOUN')
@@ -81,3 +81,18 @@ Please note that this project contains two different licenses:
   
 - Everything else (.py scripts, exception lists in .csv, etc.) is 
   licensed under the terms of [MIT license](./LICENSE).
+
+# Development
+## Run all unittests
+```bash
+glemmazon$ python -m unittest -v
+```
+## Run a single unittest module
+```bash
+glemmazon$ python -m unittest $MODULE
+```
+
+For example
+```bash
+glemmazon$ python -m unittest glemmazon.tests.test_encoder
+```
