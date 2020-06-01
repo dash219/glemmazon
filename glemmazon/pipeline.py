@@ -1,6 +1,7 @@
 """Module containing pipelines."""
 
 __all__ = [
+    'Analyzer',
     'BasePipeline',
     'LookupDictionary',
     'Lemmatizer',
@@ -17,7 +18,6 @@ import pandas as pd
 from tensorflow.keras.models import load_model, Model
 
 from glemmazon import constants as k
-from glemmazon import preprocess
 from glemmazon import utils
 from glemmazon.encoder import DictFeatureEncoder, DictLabelEncoder
 
@@ -122,7 +122,7 @@ class BasePipeline(ABC):
         if self.exceptions:
             try:
                 result = self.exceptions.lookup(**kwargs)
-                return result
+                return result[0]
             except KeyError:
                 pass
         return self.annotate(**kwargs)
@@ -179,10 +179,6 @@ class Lemmatizer(BasePipeline):
         """Annotate a single example (using the model)."""
         return utils.apply_suffix_op(word, self._predict_op(word, pos))
 
-    def load_exceptions(self, path: str):
-        """Load exceptions from a .csv file with "word, pos, lemma"."""
-        self.exceptions = preprocess.exceptions_to_dict(path)
-
     def _predict_op(self, word: str, pos: str) -> Tuple[int, str]:
         """Return the string operation for the lemma as (index, str)."""
         features = [self.feature_enc({k.WORD_COL: word,
@@ -190,3 +186,19 @@ class Lemmatizer(BasePipeline):
         y_pred_dict = self.label_enc.decode(self.model.predict(
             np.array(features)))
         return int(y_pred_dict[k.INDEX_COL]), y_pred_dict[k.SUFFIX_COL]
+
+
+class Analyzer(BasePipeline):
+    """Class to represent an analyser."""
+
+    @property
+    def dummy_example(self) -> Dict[str, str]:
+        return {'word': '', 'pos': k.UNKNOWN_TAG}
+
+    def annotate(self, word: str, pos: str) -> Dict[str, str]:
+        """Annotate a single example (using the model)."""
+        features = [self.feature_enc({k.WORD_COL: word,
+                                      k.POS_COL: pos})]
+        y_pred = self.model.predict(np.array(features))
+        y_pred_dict = self.label_enc.decode(y_pred)
+        return y_pred_dict

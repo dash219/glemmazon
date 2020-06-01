@@ -33,13 +33,20 @@ def basic(df: DataFrame) -> DataFrame:
         if morph_feature in df.columns:
             df = df[df[morph_feature].isna()]
 
+    # Fill NaN
+    df = df.fillna(k.UNSPECIFIED_TAG)
+
     # Filter rows based on POS values.
     for pos in ['PART', 'SYM', 'PUNCT', 'X']:
         if pos in df.columns:
             df = df[~df.pos.isin([pos])]
 
-    return _filter_lemmatizer(df)
+    return df
+
+
+def basic_lemmatizer(df: DataFrame) -> DataFrame:
+    return _filter_lemmatizer(basic(df))
 
 
 def dummy(df: DataFrame) -> DataFrame:
-    return _filter_lemmatizer(df)
+    return df

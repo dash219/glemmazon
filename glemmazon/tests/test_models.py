@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from glemmazon import Inflector, Lemmatizer
+from glemmazon import constants as k
+from glemmazon import Analyzer, Inflector, Lemmatizer
+
+# Analyzers
+ANA_PT_MODEL = 'models/analyzer/pt'
 
 # Lemmatizers
 LEM_EN_MODEL = 'models/lemmatizer/en'
@@ -14,23 +18,30 @@ INF_PT_MODEL = 'models/inflector/pt'
 
 
 class TestModels(unittest.TestCase):
-    def setUp(self):
-        self.l_en = Lemmatizer.load(LEM_EN_MODEL)
+    def test_analyzer_pt(self):
+        analyzer = Analyzer.load(ANA_PT_MODEL)
+        expected = {
+            'mood': 'ind', 'number': 'sing', 'person': '3',
+            'pos': 'VERB', 'tense': 'imp', 'verbform': 'fin'
+        }
+        for attr in (
+                'polarity', 'prontype', 'reflex', 'voice', 'case',
+                'definite', 'degree', 'foreign', 'gender', 'numtype'
+        ):
+            expected[attr] = k.UNSPECIFIED_TAG
+        self.assertEqual(analyzer(word='amava', pos='VERB'), expected)
 
-        self.l_pt = Lemmatizer.load(LEM_PT_MODEL)
+    def test_lemmatizer_en(self):
+        lemmatizer = Lemmatizer.load(LEM_EN_MODEL)
+        self.assertEqual(lemmatizer(word='loves', pos='VERB'), 'love')
 
-        self.l_nl = Lemmatizer.load(LEM_NL_MODEL)
+    def test_lemmatizer_pt(self):
+        lemmatizer = Lemmatizer.load(LEM_PT_MODEL)
+        self.assertEqual(lemmatizer(word='carros', pos='NOUN'), 'carro')
 
-        # self.i_pt = Inflector.load(INF_PT_MODEL)
-
-    def test_en(self):
-        self.assertEqual(self.l_en(word='loves', pos='VERB'), 'love')
-
-    def test_pt(self):
-        self.assertEqual(self.l_pt(word='carros', pos='NOUN'), 'carro')
-
-    def test_nl(self):
-        self.assertEqual(self.l_nl(word='maand', pos='VERB'),
+    def test_lemmatizer_nl(self):
+        lemmatizer = Lemmatizer.load(LEM_NL_MODEL)
+        self.assertEqual(lemmatizer(word='maand', pos='VERB'),
                          'maanden')
 
 

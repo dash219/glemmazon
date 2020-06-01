@@ -19,6 +19,7 @@ WORD_SUFFIX_COL = 'word_suffix'
 # Fallback
 UNKNOWN_POS = '_UNKNOWN_POS'
 UNKNOWN_TAG = '_UNK'
+UNSPECIFIED_TAG = '_UNSP'
 
 PARAMS_FILE = 'params.pkl'
 MODEL_FILE = 'model.h5'

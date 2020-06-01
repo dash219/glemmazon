@@ -111,7 +111,7 @@ def _build_model(input_shape, dle):
 
 
 def _add_losses_as_exceptions(l, df, logger):
-    for _, row in tqdm.tqdm(df.iterrows()):
+    for _, row in tqdm.tqdm(df.iterrows(), initial=1):
         lemma_pred = l(word=row[k_.WORD_COL], pos=row[k_.POS_COL])
         if lemma_pred != row[k_.LEMMA_COL]:
             logger.info(
@@ -122,30 +122,6 @@ def _add_losses_as_exceptions(l, df, logger):
                 word=k_.WORD_COL, pos=k_.POS_COL, lemma=k_.LEMMA_COL)
 
 
-def _get_logger(model):
-    if not os.path.exists(model):
-        os.makedirs(model)
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-
-    # create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    # create file handler which logs even debug messages
-    fh = logging.FileHandler(os.path.join(model, k_.LOG_FILE), mode='w')
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-
-    # create console handler with a higher log level
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-    return logger
-
-
 def main(_):
     if not FLAGS.conllu and not FLAGS.unimorph:
         sys.exit('At least one of the flags --conllu or --unimorph '
@@ -154,7 +130,7 @@ def main(_):
         sys.exit('A mapping file for Unimorph tags need to be '
                  'defined with the flag --mapping.')
 
-    logger = _get_logger(FLAGS.model)
+    logger = utils.get_logger(FLAGS.model)
     df = pd.DataFrame()
     if FLAGS.conllu:
         logger.info('Reading CoNLL-U sentences from "%s"...' %

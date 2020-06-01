@@ -4,7 +4,6 @@ __all__ = [
     'add_lemmatizer_info',
     'add_inflector_info',
     'conllu_to_df',
-    'exceptions_to_dict',
     'unimorph_to_df',
 ]
 
@@ -63,24 +62,20 @@ def add_inflector_info(df: DataFrame,
 def conllu_to_df(path: str,
                  clean_up: Callable = cleanup.dummy,
                  lemma_suffix_col: str = k.SUFFIX_COL,
-                 min_count: int = 3) -> DataFrame:
+                 min_count: int = 3,
+                 lemmatizer_info: bool = True) -> DataFrame:
     entries = _conllu_to_tokens(path)
     df = DataFrame(entries)
     df = clean_up(df)
-    df = add_lemmatizer_info(df)
 
-    # Exclude inflection patterns that occur only once.
-    df = df.groupby(lemma_suffix_col).filter(
-        lambda r: r[lemma_suffix_col].count() > min_count)
+    if lemmatizer_info:
+        df = add_lemmatizer_info(df)
+
+        # Exclude inflection patterns that occur only once.
+        df = df.groupby(lemma_suffix_col).filter(
+            lambda r: r[lemma_suffix_col].count() > min_count)
 
     return df
-
-
-def exceptions_to_dict(path: str) -> Dict[Tuple[str,str], str]:
-    df = pd.read_csv(path)
-    df = df[[k.WORD_COL, k.POS_COL, k.LEMMA_COL]].set_index([k.WORD_COL,
-                                                             k.POS_COL])
-    return df[k.LEMMA_COL].to_dict()
 
 
 def unimorph_to_df(path: str,

@@ -4,12 +4,14 @@ __all__ = [
     'apply_suffix_op',
     'build_index_dict',
     'encode_labels',
+    'get_logger',
     'get_suffix_op',
     'revert_dictionary'
 ]
 
 from typing import List, Tuple
 
+import logging
 import os
 import numpy as np
 
@@ -19,6 +21,7 @@ from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.utils import to_categorical
 from tensorflow.python.keras.utils import Sequence
 
+from glemmazon import constants as k_
 from glemmazon.encoder import DictFeatureEncoder, DictLabelEncoder
 
 
@@ -116,6 +119,30 @@ def get_suffix_op(a: str, b: str) -> Tuple[int, str]:
     else:
         return (len(a) - len(common_prefix),
                 b.replace(common_prefix, '', 1))
+
+
+def get_logger(model):
+    if not os.path.exists(model):
+        os.makedirs(model)
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+
+    # create formatter and add it to the handlers
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # create file handler which logs even debug messages
+    fh = logging.FileHandler(os.path.join(model, k_.LOG_FILE), mode='w')
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    return logger
 
 
 def revert_dictionary(d):

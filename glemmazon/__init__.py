@@ -1,10 +1,10 @@
 # -*- encoding: utf-8 -*-
 """Init module for glemmazon."""
 
-__all__ = ['Inflector', 'Lemmatizer']
+__all__ = ['Analyzer', 'Inflector', 'Lemmatizer']
 __version__ = '0.3'
 __author__ = 'Gustavo Mendonça'
-__date__ = '2019-08-07'
+__date__ = '2020-06-01'
 
-from glemmazon.pipeline import Lemmatizer
+from glemmazon.pipeline import Analyzer, Lemmatizer
 from glemmazon.inflector import Inflector
