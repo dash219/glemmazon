@@ -12,18 +12,15 @@ python -m glemmazon.train_lemmatizer \
   --mapping data/tag_mapping.csv \
   --model models/lemmatizer/en
 """
-import os
 import logging
+import os
 import sys
 
-import pandas as pd
-import pickle
 import numpy as np
+import pandas as pd
 import tqdm
-
 from absl import app
 from absl import flags
-
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers import (
     Dense,
@@ -31,7 +28,7 @@ from tensorflow.keras.layers import (
     Input,
     LSTM,
     Bidirectional)
-from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.models import Model
 
 from glemmazon import cleanup
 from glemmazon import constants as k_
@@ -44,7 +41,7 @@ from glemmazon.encoder import (
     LabelEncoder,
     SeqFeatureEncoder,
     SeqWordSuffix)
-from glemmazon.pipeline import Lemmatizer
+from glemmazon.pipeline import Lemmatizer, LookupDictionary
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("conllu", None, "Path to a CoNLL-U file.")
@@ -115,14 +112,15 @@ def _build_model(input_shape, dle):
 
 def _add_losses_as_exceptions(l, df, logger):
     for _, row in tqdm.tqdm(df.iterrows()):
-        lemma_pred = l(row[k_.WORD_COL], row[k_.POS_COL])
+        lemma_pred = l(word=row[k_.WORD_COL], pos=row[k_.POS_COL])
         if lemma_pred != row[k_.LEMMA_COL]:
             logger.info(
                 'Added exception: "%s" -> "%s" [pred: "%s"]' % (
                     row[k_.WORD_COL], row[k_.LEMMA_COL],
                     lemma_pred))
-            l.exceptions[(row[k_.WORD_COL], row[k_.POS_COL])] = (
-                row[k_.LEMMA_COL])
+            l.exceptions.add_entry(
+                word=k_.WORD_COL, pos=k_.POS_COL, lemma=k_.LEMMA_COL)
+
 
 def _get_logger(model):
     if not os.path.exists(model):
@@ -146,6 +144,7 @@ def _get_logger(model):
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     return logger
+
 
 def main(_):
     if not FLAGS.conllu and not FLAGS.unimorph:
@@ -222,35 +221,32 @@ def main(_):
                                   verbose=2)
     for i in range(FLAGS.epochs):
         epoch_metrics = {k: v[i] for k, v in history.history.items()}
-        logger.debug('Epoch %d: %s' % (i+1, sorted(
+        logger.debug('Epoch %d: %s' % (i + 1, sorted(
             epoch_metrics.items())))
 
-    exceptions = {}
     if FLAGS.exceptions:
         logger.info('Loading exceptions...')
-        exceptions = preprocess.exceptions_to_dict(FLAGS.exceptions)
+        exceptions = LookupDictionary.from_csv(
+            FLAGS.exceptions)
+    else:
+        exceptions = LookupDictionary(columns=[
+            k_.WORD_COL, k_.POS_COL, k_.LEMMA_COL])
 
-    logger.info('Persisting the model...')
-
-    model.save(os.path.join(FLAGS.model, k_.MODEL_FILE))
-    with open(os.path.join(FLAGS.model, k_.PARAMS_FILE),
-              'wb') as writer:
-        pickle.dump({
-            'exceptions': exceptions,
-            'feature_enc': sfe,
-            'label_enc': dle,
-        }, writer)
+    logger.info('Persisting the model and parameters...')
+    l = Lemmatizer(model=model, feature_enc=sfe, label_enc=dle,
+                   exceptions=exceptions)
+    l.save(FLAGS.model)
 
     # Add losses to the exception dictionary, so that they can be
     # labeled correctly, if specified by the caller.
     if FLAGS.no_losses:
-        logger.info('Adding losses to the dictionary with exceptions...')
-        l = Lemmatizer()
-        l.load(FLAGS.model)
+        logger.info(
+            'Adding losses to the dictionary with exceptions...')
         n_start = len(l.exceptions)
         # noinspection PyUnboundLocalVariable
         _add_losses_as_exceptions(l, orig_df, logger)
-        logger.info('# Exceptions added: %d' % (len(l.exceptions) - n_start))
+        logger.info(
+            '# Exceptions added: %d' % (len(l.exceptions) - n_start))
         l.save(FLAGS.model)
 
     logger.info('Model successfully saved in folder: %s.' % FLAGS.model)

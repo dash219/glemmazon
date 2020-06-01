@@ -22,4 +22,5 @@ UNKNOWN_TAG = '_UNK'
 
 PARAMS_FILE = 'params.pkl'
 MODEL_FILE = 'model.h5'
+EXCEPTIONS_FILE = 'exceptions.csv'
 LOG_FILE = 'train.log'

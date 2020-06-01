@@ -4,36 +4,46 @@ __all__ = ['Inflector']
 
 from typing import Dict, Tuple
 
-import os
-import re
-
 import numpy as np
-import pickle
-
-from tensorflow.keras.models import load_model, Model
 from pandas import DataFrame
+from tensorflow.keras.models import Model
 
 from glemmazon import constants as k
-from glemmazon.encoder import DictFeatureEncoder, DictLabelEncoder
+from glemmazon import preprocess
 from glemmazon import utils
+from glemmazon.encoder import DictFeatureEncoder, DictLabelEncoder
+from glemmazon.pipeline import BasePipeline, LookupDictionary
 
 
-def _query_from_kwargs(lemma, **kwargs):
-    """Turn a dictionary with features into a DataFrame query."""
-    kwargs[k.LEMMA_COL] = lemma
-    return ' and '.join(["%s == '%s'" % (key, re.escape(val))
-                         for key, val in kwargs.items()])
-
-
-class Inflector(object):
+class Inflector(BasePipeline):
     """Class to represent an inflector."""
 
-    def __init__(self):
-        """Initialize the class."""
-        self.model = None
-        self.feature_enc = None
-        self.label_enc = None
-        self.exceptions = None or DataFrame()
+    def __init__(self,
+                 model: Model,
+                 feature_enc: DictFeatureEncoder,
+                 label_enc: DictLabelEncoder,
+                 exceptions: LookupDictionary = None,
+                 first_call: bool = True):
+        """Initialize the class.
+
+        Args:
+            model (Model): The model to be loaded.
+            feature_enc (DictFeatureEncoder): Feature encoder.
+            label_enc (DictLabelEncoder): Label encoder.
+            exceptions (LookupDictionary): Exceptions dictionary.
+            first_call (bool): If True, make a first call to the model
+                when it is loaded, to avoid latency issues. The first
+                iteration of predict() is slower due to caching:
+                https://stackoverflow.com/questions/55577711
+        """
+        self.model = model
+        self.feature_enc = feature_enc
+        self.label_enc = label_enc
+        self.exceptions = exceptions or LookupDictionary()
+
+        # Make a fake first call to predict to avoid latency issues.
+        if first_call:
+            self.annotate(**self.dummy_example)
 
     def __call__(self, lemma: str, **kwargs: str) -> str:
         try:
@@ -42,38 +52,6 @@ class Inflector(object):
         except (IndexError, KeyError):
             return utils.apply_suffix_op(lemma, self._predict_op(
                 lemma, **kwargs))
-
-    def load(self, folder: str):
-        """Load the model from a folder."""
-        with open(os.path.join(folder, k.PARAMS_FILE), 'rb') as reader:
-            self.set_model(**{
-                **{'model': load_model(
-                    os.path.join(folder, k.MODEL_FILE))},
-                **pickle.load(reader)})
-
-    def save(self, folder: str):
-        """Save the model to a folder."""
-        if not os.path.exists(folder):
-            os.mkdir(folder)
-        self.model.save(os.path.join(folder, k.MODEL_FILE))
-        with open(os.path.join(folder, k.PARAMS_FILE), 'wb') as writer:
-            pickle.dump({
-                'exceptions': self.exceptions,
-                'feature_enc': self.feature_enc,
-                'label_enc': self.label_enc,
-            }, writer)
-
-    def set_model(self,
-                  model: Model,
-                  feature_enc: DictFeatureEncoder,
-                  label_enc: DictLabelEncoder,
-                  exceptions: Dict[Tuple[str, str], str] = None):
-        self.model = model
-        self.feature_enc = feature_enc
-        self.label_enc = label_enc
-        self.exceptions = (exceptions if not exceptions.empty else
-                           DataFrame(columns=feature_enc.scope | {
-                           k.WORD_COL}))
 
     def _lookup(self, lemma: str, **kwargs) -> str:
         try:
@@ -86,8 +64,17 @@ class Inflector(object):
 
     def _predict_op(self,
                     lemma: str,
-                    fill_na=False,
-                    **kwargs: str) -> Tuple[int, str]:
+                    fill_na: bool = False,
+                    **kwargs: Dict[str, str]) -> Tuple[int, str]:
+        """Return the string operation for the lemma as (index, str).
+
+        Args:
+            lemma (str): The lemma.
+            fill_na (bool): If True, will fill all unspecified
+                morphological features with k.UNKNOWN_TAG.
+            **kwargs (Dict[str, str]): Keyword arguments with the
+                morphological features.
+        """
         if fill_na:
             for feature in self.feature_enc.scope:
                 if feature != k.LEMMA_COL and feature not in kwargs:
@@ -96,8 +83,8 @@ class Inflector(object):
         features = [self.feature_enc({k.LEMMA_COL: lemma, **kwargs})]
         y_pred_dict = self.label_enc.decode(self.model.predict(
             np.array(features)))
-        return int(y_pred_dict[k.WORD_INDEX_COL]), y_pred_dict[
-            k.WORD_SUFFIX_COL]
+        return (int(y_pred_dict[k.WORD_INDEX_COL]),
+                y_pred_dict[k.WORD_SUFFIX_COL])
 
     def load_exceptions(self, df: DataFrame):
         self.validate_exceptions(df)
@@ -121,3 +108,15 @@ class Inflector(object):
             raise TypeError('Exceptions DataFrame columns do not match '
                             ' the model. Expected: %s, found: %s.' %
                             (self.feature_to_ix, _features_to_ix))
+
+    @property
+    def dummy_example(self) -> Dict[str, str]:
+        return ['amar', {'aspect': 'IMP'}]
+
+    def annotate(self, word: str, pos: str):
+        """Annotate a single example (using the model)."""
+        return utils.apply_suffix_op(word, self._predict_op(word, pos))
+
+    def load_exceptions(self, path: str):
+        """Load exceptions from a .csv file with "word, pos, lemma"."""
+        self.exceptions = preprocess.exceptions_to_dict(path)
