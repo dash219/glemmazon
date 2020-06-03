@@ -235,7 +235,7 @@ class DictLabelEncoder(LabelEncoder):
             self.encoders[p_name] = encoder
         self.scope = set(self.encoders)
 
-    def __call__(self, label_dict: str) -> np.array:
+    def __call__(self, label_dict: Dict[str, str]) -> List[np.array]:
         if set(label_dict) != self.scope:
             raise ValueError(
                 'Example label doesn\'t match the label encoders. '
@@ -246,6 +246,24 @@ class DictLabelEncoder(LabelEncoder):
         for e_name, encoder in self.encoders.items():
             dense.append(encoder(label_dict[e_name]))
         return dense
+
+    def to_single_vec(self, label_dict: Dict[str, str]) -> np.array:
+        """Encode labels into a single vector with shape (X,)."""
+        return np.hstack(self.__call__(label_dict))
+
+    def from_single_vec(self, vec: np.array) -> Dict[str, str]:
+        """Decode labels from a single vector with shape (X,)."""
+        return self.decode(self._split_single_vec(vec))
+
+    def _split_single_vec(self, vec: np.array) -> List[np.array]:
+        """Split a single vector into a list of feature vectors."""
+        arrays = []
+        prev_idx = 0
+        for enc in self.encoders.values():
+            vec_length = enc.output_shape[0]
+            arrays.append(vec[prev_idx:prev_idx + vec_length])
+            prev_idx += vec_length
+        return arrays
 
     @property
     def output_shape(self) -> Tuple[int]:

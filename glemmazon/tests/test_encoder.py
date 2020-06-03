@@ -103,6 +103,7 @@ class TestEncoder(unittest.TestCase):
             'lemma_suffix': t.LabelEncoder(['ed', 's', '']),
             'lemma_index': t.LabelEncoder(['1', '2', '3']),
         })
+        # Normal encoding/decoding
         np.testing.assert_array_equal(
             dict_le({'lemma_suffix': 'ed', 'lemma_index': '2'}),
             np.array([[0., 0., 1., 0.],
@@ -117,6 +118,17 @@ class TestEncoder(unittest.TestCase):
             {'lemma_suffix': 'ed', 'lemma_index': '2'})
         self.assertCountEqual(dict_le.scope,
                               {'lemma_suffix', 'lemma_index'})
+
+        # Single vector encoding/decoding
+        np.testing.assert_array_equal(
+            dict_le.to_single_vec(
+                {'lemma_suffix': 'ed', 'lemma_index': '2'}),
+            np.array([0., 0., 1., 0.,
+                      0., 1., 0., 0.]))
+        self.assertEqual(dict_le.from_single_vec(
+            np.array([0., 0., 1., 0.,
+                      0., 1., 0., 0.])),
+            {'lemma_suffix': 'ed', 'lemma_index': '2'})
 
 
 if __name__ == '__main__':
