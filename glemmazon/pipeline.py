@@ -3,6 +3,7 @@
 __all__ = [
     'Analyzer',
     'BasePipeline',
+    'Inflector',
     'LookupDictionary',
     'Lemmatizer',
 ]
@@ -175,7 +176,7 @@ class Lemmatizer(BasePipeline):
     def dummy_example(self) -> Dict[str, str]:
         return {'word': '', 'pos': k.UNKNOWN_TAG}
 
-    def annotate(self, word: str, pos: str):
+    def annotate(self, word: str, pos: str) -> str:
         """Annotate a single example (using the model)."""
         return utils.apply_suffix_op(word, self._predict_op(word, pos))
 
@@ -202,3 +203,44 @@ class Analyzer(BasePipeline):
         y_pred = self.model.predict(np.array(features))
         y_pred_dict = self.label_enc.decode(y_pred)
         return y_pred_dict
+
+
+class Inflector(BasePipeline):
+    """Class to represent an inflector."""
+
+    def annotate(self, lemma: str, **kwargs: str) -> str:
+        """Annotate a single example (using the model)."""
+        return utils.apply_suffix_op(lemma,
+                                     self._predict_op(lemma, **kwargs))
+
+    def _predict_op(self,
+                    lemma: str,
+                    fill_na: bool = False,
+                    **kwargs: Dict[str, str]) -> Tuple[int, str]:
+        """Return the string operation for the lemma as (index, str).
+
+        Args:
+            lemma (str): The lemma.
+            fill_na (bool): If True, will fill all unspecified
+                morphological features with k.UNKNOWN_TAG.
+            **kwargs (Dict[str, str]): Keyword arguments with the
+                morphological features.
+        """
+        if fill_na:
+            for feature in self.feature_enc.scope:
+                if feature != k.LEMMA_COL and feature not in kwargs:
+                    kwargs[feature] = k.UNSPECIFIED_TAG
+
+        features = [self.feature_enc({k.LEMMA_COL: lemma, **kwargs})]
+        y_pred_dict = self.label_enc.decode(self.model.predict(
+            np.array(features)))
+        return (int(y_pred_dict[k.WORD_INDEX_COL]),
+                y_pred_dict[k.WORD_SUFFIX_COL])
+
+    @property
+    def dummy_example(self) -> Dict[str, str]:
+        return {
+            **{'lemma': 'teste', 'pos': 'NOUN'},
+            **{key: k.UNSPECIFIED_TAG for key in self.feature_enc.scope
+               if key not in ('lemma', 'pos')}
+        }

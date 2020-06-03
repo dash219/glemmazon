@@ -3,30 +3,26 @@ r"""Module for training a new model of the inflector.
 
 Basic usage:
 python -m glemmazon.train_inflector \
-  --unimorph data/por \
-  --mapping data/tag_mapping.csv \
-  --model models/inflector/pt
+  --conllu data/en_ewt-ud-train.conllu \
+  --model models/inflector/en
 """
 
 import logging
 import os
-import sys
-
-from absl import app
-from absl import flags
-import numpy as np
-import tqdm
-import pandas as pd
 import pickle
 
+import pandas as pd
+import tqdm
+from absl import app
+from absl import flags
+from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers import (
     Dense,
     Dropout,
     Input,
     LSTM,
     Bidirectional)
-from tensorflow.keras.models import Sequential, Model
-from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Model
 
 from glemmazon import cleanup
 from glemmazon import constants as k_
@@ -39,21 +35,16 @@ from glemmazon.encoder import (
     LabelEncoder,
     SeqFeatureEncoder,
     SeqWordSuffix)
+from glemmazon.pipeline import LookupDictionary, Inflector
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("conllu", None, "Path to a CoNLL-U file.")
-flags.DEFINE_string("unimorph", None, "Path to a UniMorph file.")
-flags.DEFINE_string("mapping", None, "Path to a file containing tag "
-                                     "mappings from UniMorph to UniversalDependencies.")
 flags.DEFINE_string("model", None,
                     "Path to store the Pickle file with the model.")
 flags.DEFINE_string("exceptions", None,
                     "Path to a CSV with lemma exceptions [columns: "
                     "'word', 'pos', 'lemma'].")
-flags.DEFINE_string("cleanup_conllu", "dummy",
-                    "Name of the clean-up function to be used. Use "
-                    "'dummy' for no clean-up.")
-flags.DEFINE_string("cleanup_unimorph", "dummy",
+flags.DEFINE_string("cleanup_conllu", "basic",
                     "Name of the clean-up function to be used. Use "
                     "'dummy' for no clean-up.")
 flags.DEFINE_integer("min_count", 3,
@@ -73,6 +64,7 @@ flags.DEFINE_integer("maxlen", 10,
 flags.DEFINE_integer("epochs", 25, "Epochs for training.")
 
 flags.mark_flag_as_required('model')
+flags.mark_flag_as_required('conllu')
 
 logger = logging.getLogger(__name__)
 
@@ -129,23 +121,10 @@ def _get_losses_df(inflec, df):
 
 # noinspection PyPep8Naming
 def main(_):
-    if not FLAGS.conllu and not FLAGS.unimorph:
-        sys.exit('At least one of the flags --conllu or --unimorph '
-                 'need to be specified.')
-    elif FLAGS.unimorph and not FLAGS.mapping:
-        sys.exit('A mapping file for Unimorph tags need to be '
-                 'defined with the flag --mapping.')
-
-    df = pd.DataFrame()
-    if FLAGS.conllu:
-        print('Reading sentences from CoNLL-U...')
-        df = df.append(preprocess.conllu_to_df(
-            FLAGS.conllu, getattr(cleanup, FLAGS.cleanup_conllu),
-            min_count=FLAGS.min_count), sort=False)
-    if FLAGS.unimorph:
-        print('Reading tokens from UniMorph...')
-        df = preprocess.unimorph_to_df(FLAGS.unimorph, FLAGS.mapping,
-                                       inflector_cols=True)
+    logger.info('Reading sentences from CoNLL-U...')
+    df = preprocess.conllu_to_df(
+        FLAGS.conllu, getattr(cleanup, FLAGS.cleanup_conllu),
+        min_count=FLAGS.min_count, inflector_info=True)
 
     df.drop_duplicates(inplace=True)
     df.reset_index(drop=True, inplace=True)
@@ -160,67 +139,50 @@ def main(_):
     df = df.groupby(k_.WORD_SUFFIX_COL).filter(
         lambda r: r[k_.WORD_SUFFIX_COL].count() > FLAGS.min_count)
 
-    print('Data sample:')
-    print(df.head())
+    logger.info('Data sample:')
+    logger.info(df.head())
 
-    print('Splitting between training, test and val...')
+    logger.info('Splitting between training, test and val...')
     train, test = train_test_split(df, test_size=0.2)
-    print(len(train), 'train examples')
-    print(len(test), 'test examples')
+    logger.info('# Training examples: %d' % len(train))
+    logger.info('# Test examples: %d' % len(test))
 
-    print('Preparing training data and feature/label encoders...')
+    logger.info('Preparing training data and feature/label encoders...')
     dense_cols = [col for col in df.columns if col not in [
         k_.WORD_SUFFIX_COL, k_.WORD_INDEX_COL, k_.WORD_COL,
         k_.LEMMA_COL]]
     sfe, dle = _build_encoders(df, dense_cols)
 
-    print('Preparing test data...')
-    x_test = np.stack([sfe(dict(r)) for _, r in
-                       test[dense_cols + [k_.LEMMA_COL]].iterrows()])
-    y_test = [
-        np.vstack(e) for e in zip(*[dle(dict(r)) for _, r in test[[
-            k_.WORD_SUFFIX_COL, k_.WORD_INDEX_COL]].iterrows()])]
-    print(x_test.shape, y_test[0].shape, y_test[1].shape)
-
-    print('Preparing batch generators...')
+    logger.info('Preparing batch generators...')
     batch_generator = utils.BatchGenerator(df, sfe, dle)
 
-    print('Building the model...')
+    logger.info('Building the model...')
     model = _build_model(sfe.output_shape, dle)
     model.summary()
 
-    print('Running training...')
+    logger.info('Running training...')
     model.compile('adam', 'categorical_crossentropy',
                   metrics=['accuracy'])
     model.fit_generator(batch_generator, epochs=FLAGS.epochs, verbose=2)
 
-    exceptions = pd.DataFrame(columns=sfe.scope | {k_.WORD_COL})
     if FLAGS.exceptions:
-        print('Loading exceptions...')
-        exceptions_df = pd.read_csv(FLAGS.exceptions)
-        exceptions_df = exceptions_df.set_index([
-            col for col in exceptions_df.columns
-            if col not in [k_.WORD_COL, k_.LEMMA_COL]])
-        exceptions = exceptions_df
+        logger.info('Loading exceptions...')
+        exceptions = LookupDictionary.from_csv(FLAGS.exceptions)
+    else:
+        exceptions = LookupDictionary(columns=list(sfe.scope |
+                                                   dle.scope))
 
-    print('Persisting the model...')
-    if not os.path.exists(FLAGS.model):
-        os.mkdir(FLAGS.model)
-    model.save(os.path.join(FLAGS.model, k_.MODEL_FILE))
-    with open(os.path.join(FLAGS.model, k_.PARAMS_FILE),
-              'wb') as writer:
-        pickle.dump({
-            'exceptions': exceptions,
-            'feature_enc': sfe,
-            'label_enc': dle,
-        }, writer)
+    logger.info('Persisting the model...')
+    inflector = Inflector(model=model, feature_enc=sfe, label_enc=dle,
+                          exceptions=exceptions)
+    inflector.save(FLAGS.model)
 
     # Add losses to the exception dictionary, so that they can be
     # labeled correctly, if specified by the caller.
     if FLAGS.no_losses:
         raise NotImplementedError
 
-    print('Model successfully saved in: %s.' % FLAGS.model)
+    logger.info('Model successfully saved in: %s.' % FLAGS.model)
 
 
 if __name__ == '__main__':

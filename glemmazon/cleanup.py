@@ -1,6 +1,11 @@
 """Dataset-specific functions for cleaning up data."""
 
-__all__ = ['dummy', 'en_ewt']
+__all__ = [
+    'basic',
+    'basic_lemmatizer',
+    'dummy',
+    'en_ewt'
+]
 
 from pandas import DataFrame
 

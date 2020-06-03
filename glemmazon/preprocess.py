@@ -4,15 +4,12 @@ __all__ = [
     'add_lemmatizer_info',
     'add_inflector_info',
     'conllu_to_df',
-    'unimorph_to_df',
 ]
 
-from typing import Callable, Dict, Tuple, Set
+from typing import Callable, Dict, Set
 
-import tqdm
-import pandas as pd
 import pyconll
-
+import tqdm
 from pandas import DataFrame
 from pyconll.unit import Token
 
@@ -41,10 +38,10 @@ def add_lemmatizer_info(df: DataFrame,
 
 
 def add_inflector_info(df: DataFrame,
-                        word_col: str = k.WORD_COL,
-                        lemma_col: str = k.LEMMA_COL,
-                        suffix_col: str = k.SUFFIX_COL,
-                        index_col: str = k.INDEX_COL) -> DataFrame:
+                       word_col: str = k.WORD_COL,
+                       lemma_col: str = k.LEMMA_COL,
+                       suffix_col: str = k.SUFFIX_COL,
+                       index_col: str = k.INDEX_COL) -> DataFrame:
     # Extract lemma suffix and r_index
     idxs = []
     lemmas = []
@@ -63,7 +60,8 @@ def conllu_to_df(path: str,
                  clean_up: Callable = cleanup.dummy,
                  lemma_suffix_col: str = k.SUFFIX_COL,
                  min_count: int = 3,
-                 lemmatizer_info: bool = True) -> DataFrame:
+                 lemmatizer_info: bool = False,
+                 inflector_info: bool = False) -> DataFrame:
     entries = _conllu_to_tokens(path)
     df = DataFrame(entries)
     df = clean_up(df)
@@ -75,52 +73,11 @@ def conllu_to_df(path: str,
         df = df.groupby(lemma_suffix_col).filter(
             lambda r: r[lemma_suffix_col].count() > min_count)
 
-    return df
-
-
-def unimorph_to_df(path: str,
-                   mapping_path: str,
-                   clean_up: Callable = None,
-                   lemmatizer_cols: bool = False,
-                   inflector_cols: bool = False,
-                   unknown: str = '_UNK',
-                   ) -> DataFrame:
-    """Read a UniMorph file as a DataFrame."""
-    df = pd.read_csv(path, delimiter='\t', names=[
-        k.LEMMA_COL, k.WORD_COL, k.MORPH_FEATURES_COL],
-                     keep_default_na=False)
-
-    # Adapt UniMorph tags to UniversalDependency.
-    #
-    # Note: it is actually much faster to build a new DataFrame, in
-    # comparison with modifying an existing one in-place.
-    if mapping_path:
-        mapping_df = pd.read_csv(mapping_path)
-        mapping_df = mapping_df.set_index('unimorph')
-        entries = []
-        for _, row in tqdm.tqdm(df.iterrows()):
-            entry_feats = {'lemma': row['lemma'], 'word': row['word']}
-            for morph_tag in row[k.MORPH_FEATURES_COL].split(';'):
-                mapping_df.loc[morph_tag].to_list()
-                ud_feature, ud_tag = mapping_df.loc[morph_tag].to_list()
-                entry_feats[ud_feature] = ud_tag.upper()
-            entries.append(entry_feats)
-        df = pd.DataFrame(entries)
-
-    if clean_up:
-        df = clean_up(df)
-
-    if lemmatizer_cols:
-        df = add_lemmatizer_info(df)
-
-    if inflector_cols:
+    if inflector_info:
         # Fields are intentionally opposite.
         df = add_lemmatizer_info(
             df, word_col=k.LEMMA_COL, lemma_col=k.WORD_COL,
             suffix_col=k.WORD_SUFFIX_COL, index_col=k.WORD_INDEX_COL)
-
-    if unknown:
-        df = df.fillna(unknown)
 
     return df
 

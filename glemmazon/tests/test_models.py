@@ -14,6 +14,7 @@ LEM_NL_MODEL = 'models/lemmatizer/nl'
 
 # Inflectors
 # TODO(gustavoauma): Enable tests for the Inflector
+INF_EN_MODEL = 'models/inflector/en'
 INF_PT_MODEL = 'models/inflector/pt'
 
 
@@ -30,6 +31,18 @@ class TestModels(unittest.TestCase):
         ):
             expected[attr] = k.UNSPECIFIED_TAG
         self.assertEqual(analyzer(word='amava', pos='VERB'), expected)
+
+    def test_inflector_en(self):
+        inflector = Inflector.load(INF_EN_MODEL)
+        self.assertEqual(inflector(
+            lemma='love', tense='past', pos='VERB', fill_na=True),
+            'loved')
+
+    def test_inflector_pt(self):
+        inflector = Inflector.load(INF_PT_MODEL)
+        self.assertEqual(inflector(
+            lemma='amar', tense='imp', pos='VERB', person='1',
+            fill_na=True), 'amava')
 
     def test_lemmatizer_en(self):
         lemmatizer = Lemmatizer.load(LEM_EN_MODEL)

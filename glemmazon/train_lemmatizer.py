@@ -4,19 +4,8 @@ Basic usage:
 python -m glemmazon.train_lemmatizer \
   --conllu data/en_ewt-ud-train.conllu \
   --model models/lemmatizer/en
-
-Combine CoNLL-U and UniMorph data:
-python -m glemmazon.train_lemmatizer \
-  --conllu data/en_ewt-ud-train.conllu \
-  --unimorph data/eng \
-  --mapping data/tag_mapping.csv \
-  --model models/lemmatizer/en
 """
-import logging
-import os
-import sys
 
-import numpy as np
 import pandas as pd
 import tqdm
 from absl import app
@@ -45,19 +34,13 @@ from glemmazon.pipeline import Lemmatizer, LookupDictionary
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("conllu", None, "Path to a CoNLL-U file.")
-flags.DEFINE_string("unimorph", None, "Path to a UniMorph file.")
-flags.DEFINE_string("mapping", None, "Path to a file containing tag "
-                                     "mappings from UniMorph to UniversalDependencies.")
 flags.DEFINE_string("model", None,
                     "Path to store the Pickle file with the model.")
 
 flags.DEFINE_string("exceptions", None,
                     "Path to a CSV with lemma exceptions [columns: "
                     "'word', 'pos', 'lemma'].")
-flags.DEFINE_string("cleanup_conllu", "basic",
-                    "Name of the clean-up function to be used. Use "
-                    "'dummy' for no clean-up.")
-flags.DEFINE_string("cleanup_unimorph", "basic",
+flags.DEFINE_string("cleanup_function", "basic",
                     "Name of the clean-up function to be used. Use "
                     "'dummy' for no clean-up.")
 flags.DEFINE_integer("min_count", 3,
@@ -77,6 +60,7 @@ flags.DEFINE_integer("maxlen", 10,
 flags.DEFINE_integer("epochs", 25, "Epochs for training.")
 
 flags.mark_flag_as_required('model')
+flags.mark_flag_as_required('conllu')
 
 
 def _build_encoders(df):
@@ -123,28 +107,11 @@ def _add_losses_as_exceptions(l, df, logger):
 
 
 def main(_):
-    if not FLAGS.conllu and not FLAGS.unimorph:
-        sys.exit('At least one of the flags --conllu or --unimorph '
-                 'need to be specified.')
-    elif FLAGS.unimorph and not FLAGS.mapping:
-        sys.exit('A mapping file for Unimorph tags need to be '
-                 'defined with the flag --mapping.')
-
     logger = utils.get_logger(FLAGS.model)
-    df = pd.DataFrame()
-    if FLAGS.conllu:
-        logger.info('Reading CoNLL-U sentences from "%s"...' %
-                    FLAGS.conllu)
-        df = df.append(preprocess.conllu_to_df(
-            FLAGS.conllu, getattr(cleanup, FLAGS.cleanup_conllu),
-            min_count=FLAGS.min_count), sort=True)
-    if FLAGS.unimorph:
-        logger.info('Reading UniMorph tokens from "%s"...' %
-                    FLAGS.unimorph)
-        df = df.append(preprocess.unimorph_to_df(
-            FLAGS.unimorph, FLAGS.mapping,
-            clean_up=getattr(cleanup, FLAGS.cleanup_unimorph),
-            lemmatizer_cols=True), sort=True)
+    logger.info('Reading CoNLL-U sentences from "%s"...' % FLAGS.conllu)
+    df = preprocess.conllu_to_df(
+        FLAGS.conllu, getattr(cleanup, FLAGS.cleanup_function),
+        min_count=FLAGS.min_count, lemmatizer_info=True)
 
     df.drop_duplicates(inplace=True)
     df.reset_index(drop=True, inplace=True)
@@ -173,16 +140,6 @@ def main(_):
     logger.info('Preparing training data and feature/label encoders...')
     sfe, dle = _build_encoders(df)
 
-    logger.info('Preparing test data...')
-    x_test = np.stack([sfe(dict(r)) for _, r in
-                       test[['word', 'pos']].iterrows()])
-    y_test = [np.vstack(e) for e in
-              zip(*[dle(dict(r)) for _, r in
-                    test[['lemma_suffix', 'lemma_index']].iterrows()])]
-    logger.info('x_test shape: %s' % (x_test.shape,))
-    logger.info('y_test[0] shape: %s' % (y_test[0].shape,))
-    logger.info('y_test[1] shape: %s' % (y_test[1].shape,))
-
     logger.info('Preparing batch generators...')
     batch_generator = utils.BatchGenerator(df, sfe, dle)
 
@@ -209,21 +166,21 @@ def main(_):
             k_.WORD_COL, k_.POS_COL, k_.LEMMA_COL])
 
     logger.info('Persisting the model and parameters...')
-    l = Lemmatizer(model=model, feature_enc=sfe, label_enc=dle,
-                   exceptions=exceptions)
-    l.save(FLAGS.model)
+    lemmatizer = Lemmatizer(model=model, feature_enc=sfe, label_enc=dle,
+                            exceptions=exceptions)
+    lemmatizer.save(FLAGS.model)
 
     # Add losses to the exception dictionary, so that they can be
     # labeled correctly, if specified by the caller.
     if FLAGS.no_losses:
         logger.info(
             'Adding losses to the dictionary with exceptions...')
-        n_start = len(l.exceptions)
+        n_start = len(lemmatizer.exceptions)
         # noinspection PyUnboundLocalVariable
-        _add_losses_as_exceptions(l, orig_df, logger)
-        logger.info(
-            '# Exceptions added: %d' % (len(l.exceptions) - n_start))
-        l.save(FLAGS.model)
+        _add_losses_as_exceptions(lemmatizer, orig_df, logger)
+        logger.info('# Exceptions added: %d' % (
+                len(lemmatizer.exceptions) - n_start))
+        lemmatizer.save(FLAGS.model)
 
     logger.info('Model successfully saved in folder: %s.' % FLAGS.model)
 

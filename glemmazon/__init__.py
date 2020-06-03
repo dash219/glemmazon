@@ -6,5 +6,4 @@ __version__ = '0.3'
 __author__ = 'Gustavo Mendonça'
 __date__ = '2020-06-01'
 
-from glemmazon.pipeline import Analyzer, Lemmatizer
-from glemmazon.inflector import Inflector
+from glemmazon.pipeline import Analyzer, Inflector, Lemmatizer
