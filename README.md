@@ -120,10 +120,18 @@ glemmazon$ python -m unittest glemmazon.tests.test_encoder
 ```
 
 # Deployment
+## Upload the package to PyPi
 Manually change the version in setup.py and __init__.py, then build the
 package and upload it via twine:
 ```bash
 rm -R sdist
 python setup.py sdist
 twine upload dist/*
+```
+
+# Test the new package in a virtual environment
+```bash
+virtualenv -p python3 test_env
+source test_env/bin/activate
+pip install glemmazon
 ```
