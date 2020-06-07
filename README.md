@@ -118,3 +118,12 @@ For example
 ```bash
 glemmazon$ python -m unittest glemmazon.tests.test_encoder
 ```
+
+# Deployment
+Manually change the version in setup.py and __init__.py, then build the
+package and upload it via twine:
+```bash
+rm -R sdist
+python setup.py sdist
+twine upload dist/*
+```
