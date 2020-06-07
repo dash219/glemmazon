@@ -2,7 +2,7 @@
 from setuptools import setup
 
 setup(name='glemmazon',
-      version='0.3',
+      version='0.4',
       description='Simple Python lemmatizer for several languages',
       url='http://github.com/gustavoauma/glemmazon',
       author='Gustavo Mendonça',
