@@ -104,4 +104,8 @@ venv.bak/
 .mypy_cache/
 
 # glemmazon
-tmp/
+/tmp/
+/virt3/
+/test_env/
+/.idea/
+/.circleci/
