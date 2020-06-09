@@ -6,12 +6,15 @@ __all__ = [
     'Inflector',
     'LookupDictionary',
     'Lemmatizer',
+    'Result',
+    'Source',
 ]
 
 import os
 import pickle
 import re
 from abc import abstractmethod, ABC
+from enum import Enum
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -21,6 +24,29 @@ from tensorflow.keras.models import load_model, Model
 from glemmazon import constants as k
 from glemmazon import utils
 from glemmazon.encoder import DictFeatureEncoder, DictLabelEncoder
+
+
+class Source(Enum):
+    DICTIONARY = 1
+    MODEL = 2
+
+
+class Result(object):
+    def __init__(self, data: Dict[str, str], source: Source):
+        self.data = data
+        self.source = source
+
+    def __eq__(self, other):
+        return self.data == other.data and self.source == other.source
+
+    def __repr__(self):
+        return str(self.__dict__)
+
+    def __str__(self):
+        return locals()
+
+    def to_dict(self):
+        return self.__dict__
 
 
 class LookupDictionary(object):
@@ -48,7 +74,8 @@ class LookupDictionary(object):
     def to_csv(self, path: str):
         self.df.to_csv(path)
 
-    def lookup(self, **kwargs) -> List[Dict[str, str]]:
+    def lookup(self, keep_cols=None, omit_cols=None, **kwargs
+               ) -> List[Dict[str, str]]:
         """Lookup key in the exceptions dictionary.
 
         Raises:
@@ -66,14 +93,19 @@ class LookupDictionary(object):
         q = self._build_query(**kwargs)
 
         try:
-            result = self.df.query(q)
+            result_df = self.df.query(q)
         except pd.core.computation.ops.UndefinedVariableError as e:
             raise ValueError(e)
-
-        if result.empty:
+        if result_df.empty:
             raise KeyError(
                 f'Could not find entry with attributes: {kwargs}')
-        return result.to_dict('records')
+
+        # Filters
+        if omit_cols:
+            result_df = result_df.drop(omit_cols, axis=1)
+        if keep_cols:
+            result_df = result_df[keep_cols]
+        return result_df.to_dict('records')
 
     def add_entry(self, **kwargs):
         try:
@@ -117,16 +149,16 @@ class BasePipeline(ABC):
 
         # Make a fake first call to predict to avoid latency issues.
         if first_call:
-            self.annotate(**self.dummy_example)
+            self.predict(**self._dummy_example)
 
-    def __call__(self, **kwargs) -> List[Dict[str, str]]:
+    def __call__(self, **kwargs) -> Result:
         if self.exceptions:
             try:
-                result = self.exceptions.lookup(**kwargs)
-                return result[0]
+                return Result(data=self.lookup(**kwargs),
+                              source=Source.DICTIONARY)
             except KeyError:
                 pass
-        return self.annotate(**kwargs)
+        return Result(data=self.predict(**kwargs), source=Source.MODEL)
 
     @classmethod
     def load(cls, path: str):
@@ -156,29 +188,44 @@ class BasePipeline(ABC):
 
     @property
     @abstractmethod
-    def dummy_example(self):
+    def _dummy_example(self):
         """Dummy example to be used in the first call of the model.
 
         Note: the first iteration of predict() in tensorflow s slower
         due to caching: https://stackoverflow.com/questions/55577711.
         """
 
+    def lookup(self, **kwargs) -> Dict[str, str]:
+        """Lookup a single key and value."""
+        return self.exceptions.lookup(**kwargs)[0]  # Return first.
+
     @property
     @abstractmethod
-    def annotate(self, *args, **kwargs):
+    def predict(self, *args, **kwargs) -> Dict[str, str]:
         """Annotate a single example (using the model)."""
 
 
 class Lemmatizer(BasePipeline):
     """Class to represent a lemmatizer."""
 
-    @property
-    def dummy_example(self) -> Dict[str, str]:
-        return {'word': '', 'pos': k.UNKNOWN_TAG}
+    def get_lemma(self, **kwargs):
+        try:
+            return self.__call__(**kwargs).data[k.LEMMA_COL]
+        except KeyError as e:
+            raise KeyError(
+                f'Couldn\'t get lemma for kwargs: {kwargs}.', e)
 
-    def annotate(self, word: str, pos: str) -> str:
+    def lookup(self, **kwargs) -> Dict[str, str]:
+        return super().lookup(keep_cols=[k.LEMMA_COL], **kwargs)
+
+    def predict(self, word: str, pos: str) -> Dict[str, str]:
         """Annotate a single example (using the model)."""
-        return utils.apply_suffix_op(word, self._predict_op(word, pos))
+        return {k.LEMMA_COL: utils.apply_suffix_op(
+            word, self._predict_op(word, pos))}
+
+    @property
+    def _dummy_example(self) -> Dict[str, str]:
+        return {'word': '', 'pos': k.UNKNOWN_TAG}
 
     def _predict_op(self, word: str, pos: str) -> Tuple[int, str]:
         """Return the string operation for the lemma as (index, str)."""
@@ -192,11 +239,7 @@ class Lemmatizer(BasePipeline):
 class Analyzer(BasePipeline):
     """Class to represent an analyser."""
 
-    @property
-    def dummy_example(self) -> Dict[str, str]:
-        return {'word': '', 'pos': k.UNKNOWN_TAG}
-
-    def annotate(self, word: str, pos: str) -> Dict[str, str]:
+    def predict(self, word: str, pos: str) -> Dict[str, str]:
         """Annotate a single example (using the model)."""
         features = [self.feature_enc({k.WORD_COL: word,
                                       k.POS_COL: pos})]
@@ -204,14 +247,28 @@ class Analyzer(BasePipeline):
         y_pred_dict = self.label_enc.decode(y_pred)
         return y_pred_dict
 
+    @property
+    def _dummy_example(self) -> Dict[str, str]:
+        return {'word': '', 'pos': k.UNKNOWN_TAG}
+
 
 class Inflector(BasePipeline):
     """Class to represent an inflector."""
 
-    def annotate(self, lemma: str, **kwargs: str) -> str:
+    def get_word(self, **kwargs):
+        try:
+            return self.__call__(**kwargs).data[k.WORD_COL]
+        except KeyError as e:
+            raise KeyError(
+                f'Couldn\'t get word for kwargs: {kwargs}.', e)
+
+    def lookup(self, **kwargs) -> Dict[str, str]:
+        return super().lookup(keep_cols=[k.WORD_COL], **kwargs)
+
+    def predict(self, lemma: str, **kwargs: str) -> Dict[str, str]:
         """Annotate a single example (using the model)."""
-        return utils.apply_suffix_op(lemma,
-                                     self._predict_op(lemma, **kwargs))
+        return {k.WORD_COL: utils.apply_suffix_op(
+            lemma, self._predict_op(lemma, **kwargs))}
 
     def _predict_op(self,
                     lemma: str,
@@ -238,7 +295,7 @@ class Inflector(BasePipeline):
                 y_pred_dict[k.WORD_SUFFIX_COL])
 
     @property
-    def dummy_example(self) -> Dict[str, str]:
+    def _dummy_example(self) -> Dict[str, str]:
         return {
             **{'lemma': 'teste', 'pos': 'NOUN'},
             **{key: k.UNSPECIFIED_TAG for key in self.feature_enc.scope

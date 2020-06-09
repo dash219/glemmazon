@@ -21,6 +21,14 @@ class TestPipeline(unittest.TestCase):
             self.ldict.lookup(word='amaram', tense='past'),
             [{'word': 'amaram', 'tense': 'past', 'person': '3'}])
 
+        self.assertEqual(
+            self.ldict.lookup(word='amo', keep_cols=['tense', 'word']),
+            [{'word': 'amo', 'tense': 'past'}])
+
+        self.assertEqual(
+            self.ldict.lookup(word='amo', omit_cols=['tense']),
+            [{'word': 'amo', 'person': '1'}])
+
     def test_invalid_lookup(self):
         with self.assertRaises(KeyError):
             self.ldict.lookup(word='invalid_value')

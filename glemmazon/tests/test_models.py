@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from glemmazon import constants as k
 from glemmazon import Analyzer, Inflector, Lemmatizer
+from glemmazon import constants as k
+from glemmazon.pipeline import Result, Source
 
 # Analyzers
 ANA_PT_MODEL = 'models/analyzer/pt'
@@ -30,31 +31,37 @@ class TestModels(unittest.TestCase):
                 'definite', 'degree', 'foreign', 'gender', 'numtype'
         ):
             expected[attr] = k.UNSPECIFIED_TAG
-        self.assertEqual(analyzer(word='amava', pos='VERB'), expected)
+        self.assertEqual(analyzer(word='amava', pos='VERB').data,
+                         expected)
 
     def test_inflector_en(self):
         inflector = Inflector.load(INF_EN_MODEL)
-        self.assertEqual(inflector(
+        self.assertEqual(inflector.get_word(
             lemma='love', tense='past', pos='VERB', fill_na=True),
             'loved')
 
     def test_inflector_pt(self):
         inflector = Inflector.load(INF_PT_MODEL)
-        self.assertEqual(inflector(
+        self.assertEqual(inflector.get_word(
             lemma='amar', tense='imp', pos='VERB', person='1',
             fill_na=True), 'amava')
 
     def test_lemmatizer_en(self):
         lemmatizer = Lemmatizer.load(LEM_EN_MODEL)
-        self.assertEqual(lemmatizer(word='loves', pos='VERB'), 'love')
+        self.assertEqual(lemmatizer.get_lemma(word='loves', pos='VERB'),
+                         'love')
+        self.assertEqual(
+            lemmatizer(word='loves', pos='VERB'),
+            Result(data={'lemma': 'love'}, source=Source.MODEL))
 
     def test_lemmatizer_pt(self):
         lemmatizer = Lemmatizer.load(LEM_PT_MODEL)
-        self.assertEqual(lemmatizer(word='carros', pos='NOUN'), 'carro')
+        self.assertEqual(
+            lemmatizer.get_lemma(word='carros', pos='NOUN'), 'carro')
 
     def test_lemmatizer_nl(self):
         lemmatizer = Lemmatizer.load(LEM_NL_MODEL)
-        self.assertEqual(lemmatizer(word='maand', pos='VERB'),
+        self.assertEqual(lemmatizer.get_lemma(word='maand', pos='VERB'),
                          'maanden')
 
 
