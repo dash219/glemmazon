@@ -43,7 +43,7 @@ class Result(object):
         return str(self.__dict__)
 
     def __str__(self):
-        return locals()
+        return str(locals())
 
     def to_dict(self):
         return self.__dict__
@@ -72,7 +72,7 @@ class LookupDictionary(object):
         return LookupDictionary(df)
 
     def to_csv(self, path: str):
-        self.df.to_csv(path)
+        self.df.to_csv(path, index=False)
 
     def lookup(self, keep_cols=None, omit_cols=None, **kwargs
                ) -> List[Dict[str, str]]:
@@ -238,6 +238,9 @@ class Lemmatizer(BasePipeline):
 
 class Analyzer(BasePipeline):
     """Class to represent an analyser."""
+
+    def lookup(self, **kwargs) -> Dict[str, str]:
+        return super().lookup(omit_cols=[k.WORD_COL], **kwargs)
 
     def predict(self, word: str, pos: str) -> Dict[str, str]:
         """Annotate a single example (using the model)."""

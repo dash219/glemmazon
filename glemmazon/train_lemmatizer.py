@@ -96,7 +96,8 @@ def _build_model(input_shape, dle):
 
 def _add_losses_as_exceptions(l, df, logger):
     for _, row in tqdm.tqdm(df.iterrows(), initial=1):
-        lemma_pred = l(word=row[k_.WORD_COL], pos=row[k_.POS_COL])
+        lemma_pred = l.get_lemma(word=row[k_.WORD_COL],
+                                 pos=row[k_.POS_COL])
         if lemma_pred != row[k_.LEMMA_COL]:
             logger.info(
                 'Added exception: "%s" -> "%s" [pred: "%s"]' % (

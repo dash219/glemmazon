@@ -108,7 +108,7 @@ def _get_losses_df(inflec, df):
     for _, row in tqdm.tqdm(df.iterrows()):
         kwargs = dict([(key, val) for key, val in row.items()
                        if key in inflec.feature_to_ix])
-        word_pred = inflec(row[k_.LEMMA_COL], **kwargs)
+        word_pred = inflec.get_word(row[k_.LEMMA_COL], **kwargs)
         if word_pred[1] != row[k_.WORD_COL]:
             logger.info(
                 'Added exception: "%s" -> "%s" [pred: "%s"]' % (

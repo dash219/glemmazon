@@ -236,11 +236,15 @@ class DictLabelEncoder(LabelEncoder):
         self.scope = set(self.encoders)
 
     def __call__(self, label_dict: Dict[str, str]) -> List[np.array]:
-        if set(label_dict) != self.scope:
+        curr_labels = set(label_dict)
+        if curr_labels != self.scope:
             raise ValueError(
                 'Example label doesn\'t match the label encoders. '
-                'Expected: %s. Found: %s.' % (
-                    list(self.scope), list(label_dict)))
+                'Expected: %s. Found: %s. Diff: %s' % (
+                    sorted(list(self.scope)),
+                    sorted(list(label_dict)),
+                    curr_labels - self.scope | self.scope - curr_labels
+                ))
 
         dense = []
         for e_name, encoder in self.encoders.items():

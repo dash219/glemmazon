@@ -93,7 +93,7 @@ def _build_model(input_shape, dle):
 def _add_losses_as_exceptions(l, df, logger):
     for i, row in tqdm.tqdm(df.iterrows(), initial=1):
         feats_dict = {'word': row[k.WORD_COL], 'pos': row[k.POS_COL]}
-        y_pred_dict = l(word=row[k.WORD_COL], pos=row[k.POS_COL])
+        y_pred_dict = l(word=row[k.WORD_COL], pos=row[k.POS_COL]).data
         all_attrs = {**feats_dict, **y_pred_dict}
 
         row_as_dict = row.to_dict()
